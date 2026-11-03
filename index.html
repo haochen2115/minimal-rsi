@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minimal-RSI</title><meta name="description" content="Does practicing on a smaller model make a model better at improving itself? 在更小的模型上练习，能让模型更擅长改进自己吗？"><meta name="author" content="Hao Chen">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700;6..72,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F5F7FA;--paper:#fff;--ink:#1B1F27;--ink2:#5C6470;--ink3:#7b8188;--rule:#D3D8E0;--accent:#2F5D9B;--plate:#fcfcfb}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#13161C;--paper:#1B1F27;--ink:#E6E9EF;--ink2:#9AA3B2;--ink3:#8b9197;--rule:#333A47;--accent:#8FB0E0;--plate:#1B1F27;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#13161C;--paper:#1B1F27;--ink:#E6E9EF;--ink2:#9AA3B2;--ink3:#8b9197;--rule:#333A47;--accent:#8FB0E0;--plate:#1B1F27;color-scheme:dark}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 16.5px/1.7 "IBM Plex Sans","PingFang SC","Noto Sans SC",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding-inline:20px;padding-block:56px 72px;display:grid;gap:28px}
+.plate{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:14px} .plate img{display:block;width:100%;height:auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+a.card{display:grid;gap:8px;padding:22px 24px;background:var(--paper);border:1px solid var(--rule);border-radius:12px;color:inherit;text-decoration:none;min-width:0}
+a.card:hover,a.card:focus-visible{border-color:var(--accent);outline:none}
+.k{font:500 12.5px "JetBrains Mono",monospace;letter-spacing:.08em;color:var(--accent)}
+.en-t{font:700 26px/1.2 "Newsreader",Georgia,serif} .zh-t{font:900 24px/1.35 "Noto Serif SC","Songti SC",serif}
+.d{color:var(--ink2);font-size:15px} .by{font:400 14px "JetBrains Mono",monospace;color:var(--ink3)} .by b{color:var(--ink);font-weight:500}
+</style></head><body>
+<div class="wrap">
+  <div class="plate"><img src="assets/figs/fig_plane.png" alt="One turn of the loop in the (I, T) plane" width="1320" height="1020"></div>
+  <div class="cards">
+    <a class="card" href="en/index.html" lang="en">
+      <span class="k">Read in English</span>
+      <span class="en-t">Minimal-RSI: does practicing on a smaller model make a model better at improving itself?</span>
+      <span class="d">A 9B model designs the training of a 2B model, learns from the measured outcomes, then designs its own training — two real turns of a recursive self-improvement loop.</span>
+    </a>
+    <a class="card" href="zh/index.html" lang="zh">
+      <span class="k">中文阅读</span>
+      <span class="zh-t">Minimal-RSI：在更小的模型上练习，能让模型更擅长改进自己吗？</span>
+      <span class="d">9B 模型为 2B 模型设计训练、在真实结果上学习、再为自己设计训练——一个每一步都真实执行的递归自我改进闭环，完整的两圈。</span>
+    </a>
+  </div>
+  <div class="by"><b>Hao Chen</b> · haochen2115@gmail.com · November 2026</div>
+</div>
+</body></html>

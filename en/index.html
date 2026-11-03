@@ -1,0 +1,126 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minimal-RSI</title><meta name="description" content="Does practicing on a smaller model make a model better at improving itself? A minimal recursive self-improvement loop in which every step is real."><meta name="author" content="Hao Chen">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700;6..72,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}</style>
+<style>html{color-scheme:light dark}body{margin:0} .lang{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:28px} .lang a{margin-right:14px}</style>
+</head><body>
+<div class="col">
+<div class="lang"><a href="../en/">English</a><a href="../zh/">中文</a></div>
+<div class="eyebrow">Technical report · Hao Chen</div>
+<h1 style="font-family:Newsreader,Georgia,serif">Minimal-RSI: does practicing on a smaller model make a model better at improving itself?</h1>
+<p class="sub">A minimal recursive self-improvement loop in which every step is real — a 9B model designs the training of a 2B model, learns from the measured outcomes, then designs its own training — and the answer it gives.</p>
+<div class="links"><a href="#abstract">Abstract</a><a href="#findings">Findings</a><a href="#method">Method</a><a href="#results">Results</a><a href="#analysis">Analysis</a><a href="#limits">Limitations</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
+
+<div class="abstract" id="abstract"><div class="h">Abstract</div>
+<p>Recursive self-improvement (RSI) is mostly discussed at scales where it cannot be studied as a controlled experiment. We present <b>Minimal-RSI</b>, a small system in which the defining loop of RSI is carried out for real: a language model designs a training program for a model, the program is executed, its effect is measured, the model is trained on the programs that worked, and it then designs and undergoes its own training. The system uses a single model family — a 9B <em>researcher</em> and a 2B <em>proxy</em> — supervised fine-tuning only, and eight 40 GB GPUs. We measure two full turns of the loop. The researcher runs 244 real training experiments on flawed 2B checkpoints (976 proxy trainings) and is fine-tuned on the programs that worked, with rehearsal drawn from its own verified samples. This single update raises both abilities at once: improvement ability on sealed proxy tasks with a defect never seen in practice rises from +0.8 to +1.3 points of uplift, and the researcher's own pass@1 on held-out LiveCodeBench problems rises by +1.9 points; a dose-matched control attributes the former to the improvement experience and the latter to on-policy rehearsal. The updated researcher then designs its own training; the program selected on a development split reaches 62.5% pass@1, +4.6 points over the base model and +2.1 over the same self-design-and-select procedure without proxy practice. In a second round, task ability plateaus for both chains while improvement ability rises with every update and falls with every self-training step. Across all conditions, self-designed training lowers its target in most instances, while the successful programs are predictable from a development split (r = 0.79): at this scale the dependable gains come from practice plus selection among the model's own designs.</p></div>
+
+<h2 id="findings"><span class="no">§</span>Findings</h2>
+<div class="findings">
+<div class="f"><div class="k">Finding 1</div><div class="n pos">I +0.5 · T +1.9</div><div class="t">One update raises both abilities</div><div class="d">Practice on 2B proxies, consolidated by an on-policy update, raises the researcher's improvement ability and task ability in the same step; self-design with selection then reaches 62.5% (+4.6).</div></div>
+<div class="f"><div class="k">Finding 2</div><div class="n acc">Two sources</div><div class="t">T from rehearsal, I from improvement experience</div><div class="d">The same update without the improvement examples raises T equally but not I, and only 4 of 32 proposals run. Rehearsal on other models' solutions costs 15 points of T.</div></div>
+<div class="f"><div class="k">Finding 3</div><div class="n neg">19 / 30</div><div class="t">Self-designed training mostly hurts, but predictably</div><div class="d">19 of 30 self-designed programs lower their target; dev and held-out scores correlate at r = 0.79. At this scale, selection is worth more than learned design.</div></div>
+<div class="f"><div class="k">Finding 4</div><div class="n warm">No bootstraps</div><div class="t">Without an external input the loop turns once</div><div class="d">The control chain gains +2.5 once and stops; in the practice chain the ability fed by real experiments keeps rising (I 0.84 → 1.87) while T plateaus with the control. Improvement runs at the rate new information enters.</div></div>
+</div>
+
+<h2 id="problem"><span class="no">1</span>Problem</h2>
+<p>A system improves itself recursively when the procedure that improves it is itself a product of the system and gets better as the system does. For language models the procedure is training, so the object of interest is a model that decides how models — including itself — should be trained, and whose decisions improve with experience. Studying this at frontier scale is expensive and hard to control. We ask instead for the smallest setting in which every step of the loop is real, so that its central assumption can be tested directly.</p>
+<p>We adopt three operational requirements. <b>R1</b> The improvement operator (a training program) is produced by the model, not fixed by the experimenter. <b>R2</b> The ability to produce programs is learned from the measured effect of programs that were actually run — not from a learned reward model or self-assessment. <b>R3</b> Task ability <b>T</b> and improvement ability <b>I</b> are measured separately, so that running the loop is not mistaken for improving. R2 needs many real outcomes, and training the model itself is the most expensive experiment available to it — so the model practices on a smaller model of the same family. This poses the paper's question: <em>does skill at improving a small proxy transfer to improving oneself?</em></p>
+
+<h2 id="method"><span class="no">2</span>Method</h2>
+<div class="steps">
+<div class="step"><div class="k">(a) Proxy practice</div><p>The researcher θ reads the failure profile of a flawed 2B world and writes a training program; a coding agent implements it, the 2B is trained under 4 seeds and scored on the held-out split, and programs are ranked by uplift within each world.</p></div>
+<div class="step"><div class="k">(b) Improvement update</div><p>θ is fine-tuned on the original (prompt, response) pairs of the top 25% of programs, mixed with 60% rehearsal — its own samples on the train split that pass the tests — giving θ_B.</p></div>
+<div class="step"><div class="k">(c) Self-design</div><p>θ_B answers the <b>same prompt template</b> with itself as the subject; the program is applied to its own weights.</p></div>
+<div class="step"><div class="k">(d) Evaluation protocol</div><p>A fixed target θ₀; θ₀ and θ_B each write K = 8 programs, all really trained, and the dT distributions are compared. C = the best of θ₀'s programs by dev; B self: θ_B designs for itself.</p></div>
+</div>
+</div>
+
+<figure class="wide"><div class="plate"><img src="../assets/figs/fig1_method.svg" alt="Figure 1"></div>
+<figcaption><b>Figure 1 · Method overview.</b> Orange is the 2B proxy, blue the 9B, green the measurements. The prompt in (c) is identical to (a); only the "model to improve" changes from a 2B world to the 9B itself — the condition under which the transfer hypothesis can be tested. The strip plot in (d) is schematic.</figcaption></figure>
+
+<div class="col">
+<p><b>Quantities.</b> T(θ) is pass@1 on the held-out split (avg@4, temperature 0.8, averaged over 4–8 independent evaluation runs). The uplift of program p on world w is the 2B descendant's pass@1 minus the parent's (mean of 8 runs). I(θ) is the mean uplift of θ's programs on <b>sealed</b> worlds, whose defect type never appears in practice. dT(p) = T(target trained by p) − T(target); a program that cannot be executed counts as 0. The transfer outcome is Δ = mean dT(B) − mean dT(A), z ≥ 2 taken as support; the rule and K = 8 were fixed before the runs.</p>
+<div class="tw"><table><caption><b>Table 0 · Setup.</b></caption>
+<tr><th>Models</th><td>Qwen3.5-9B (researcher) / Qwen3.5-2B (proxy); non-thinking mode; the implementing agent is identical across conditions</td></tr>
+<tr><th>Data</th><td>LiveCodeBench v6: train 380 / dev 126 / hidden 127, difficulty-stratified and disjoint; a 422-problem temporal OOD set used once</td></tr>
+<tr><th>Worlds</th><td>6 rollout (3 defect types × 2 seeds) + 2 sealed (a 4th defect type never seen in practice)</td></tr>
+<tr><th>Proxy practice</th><td>244 distinct programs, 4 seeds, top 25% per world; reward reliability 0.62–0.89 on 5 of 6 worlds</td></tr>
+<tr><th>9B training</th><td>8-GPU FSDP, full-parameter, fp32 master weights, lr 2·10⁻⁶; one epoch for the update; 240K-token budget for self-design</td></tr>
+<tr><th>Compute</th><td>8× A100-40G; condition A 19.7 GPU-h, B 42.2 (22.0 proxy practice), C none extra</td></tr>
+</table></div>
+
+<h2 id="results"><span class="no">3</span>Results</h2>
+<h3>3.1 One turn of the loop: both abilities rise together</h3>
+<div class="tw"><table><caption><b>Table 1 · The researcher before and after the update, and after self-design.</b></caption>
+<tr><th>checkpoint</th><th class="num">T (held-out pass@1)</th><th class="num">I (sealed proxy worlds)</th><th class="num">valid programs</th></tr>
+<tr><td>θ₀, base</td><td class="num">0.5785 ± 0.0049</td><td class="num">+0.0084 ± 0.0042</td><td class="num">17 / 32</td></tr>
+<tr class="hl"><td>θ_B, after proxy practice + update</td><td class="num"><b>0.5972</b> (+1.9)</td><td class="num"><b>+0.0130</b> ± 0.0022</td><td class="num">31 / 32</td></tr>
+<tr class="hl"><td>θ_B after self-design, selected on dev</td><td class="num"><b>0.6245</b> (+4.6)</td><td class="num">—</td><td class="num">—</td></tr>
+<tr><td>control: same update, rehearsal only</td><td class="num">0.6034 (+2.5)</td><td class="num">+0.0059 ± 0.0030</td><td class="num">4 / 32</td></tr>
+</table></div>
+<p>On the two sealed worlds, whose defect type never appears in practice, θ_B's programs are valid 97% of the time against 53% (Fisher p &lt; 0.001), and the scored programs' mean uplift rises from +0.0084 to +0.0130 (22 of 26 positive). The researcher's own task ability rises by +1.9 points. A dose-matched control separates the two effects: an update of the same size on rehearsal alone raises T as much (+2.5) but leaves I at +0.6 with only 4 of 32 proposals executable — <b>the task-ability gain is the on-policy rehearsal; the improvement-ability gain is the improvement experience</b>. θ_B then designs eight programs for itself; the one selected on the development split reaches 0.6245.</p>
+<figure><div class="plate"><img src="../assets/figs/fig_plane.png" alt="Figure 2"></div>
+<figcaption><b>Figure 2 · One turn of the loop in the (I, T) plane.</b> Filled markers are measured checkpoints with standard errors. Proxy practice with the on-policy update moves the researcher up and to the right; the same update without the improvement examples moves it up only; self-design with selection then moves either researcher up, further from the practised one.</figcaption></figure>
+
+<h3>3.2 Does practice improve self-design?</h3>
+<div class="tw"><table><caption><b>Table 2 · Self-improvement effect of K = 8 programs per condition, each dT against its own target.</b> A program that could not be executed counts as 0.</caption>
+<tr><th>condition</th><th>proposer → target</th><th class="num">executed</th><th class="num">mean dT ± s.e.</th><th class="num">dT &gt; 0</th><th class="num">best by dev (test dT)</th></tr>
+<tr><td>A Self-design</td><td>θ₀ → θ₀</td><td class="num">8 / 8</td><td class="num">−0.0260 ± 0.0115</td><td class="num">2 / 8</td><td class="num">+0.0253 (C)</td></tr>
+<tr><td>B Proxy-practice</td><td>θ_B → θ₀</td><td class="num">6 / 8</td><td class="num">−0.0127 ± 0.0124</td><td class="num">3 / 8</td><td class="num">−0.0111</td></tr>
+<tr class="hl"><td>B self</td><td>θ_B → θ_B</td><td class="num">8 / 8</td><td class="num">−0.0079 ± 0.0120</td><td class="num">4 / 8</td><td class="num">+0.0273 (T = 0.6245)</td></tr>
+</table></div>
+<p><b>Transfer (B vs A): Δ = +0.0133 ± 0.0169, z = 0.79.</b> The updated researcher's programs for the base target are less harmful on average, in the hypothesised direction, but the difference does not reach the criterion; the interval excludes a transfer effect larger than about 4.6 points. Designing for itself, θ_B's programs average −0.8 (A: −2.6) and its selected program ends +2.1 points above C.</p>
+<p>Two features of the distributions matter more than their difference. <b>Self-designed training mostly hurts</b>: 19 of 30 executed programs lowered their target, and the within-condition spread is two to three times any between-condition difference. <b>The good programs are identifiable in advance</b>: across the 22 checkpoints targeting θ₀, dev and held-out scores correlate at r = 0.79, so selection on dev recovers real gains in every condition.</p>
+<figure><div class="plate"><img src="../assets/figs/fig2_dT.png" alt="Figure 3"></div>
+<figcaption><b>Figure 3 · dT of each program against its own target.</b> Bars are condition means ± s.e.; open circles are programs that could not be executed; the star is C (A's best by dev, reported on the held-out split).</figcaption></figure>
+
+<h3>3.3 Ablation: the rehearsal source decides whether the update helps or destroys</h3>
+<div class="tw"><table><caption><b>Table 3 · The update on the same 50 selected programs with rehearsal from different sources (token mass matched).</b></caption>
+<tr><th>rehearsal</th><th class="num">T after update</th><th class="num">ΔT</th><th class="num">I after update</th><th class="num">transfer Δ vs A</th></tr>
+<tr><td>other models' solutions (pool)</td><td class="num">0.4282</td><td class="num neg">−0.150</td><td class="num">+0.0157</td><td class="num">+0.003 (z = 0.2)</td></tr>
+<tr class="hl"><td>own verified samples</td><td class="num">0.5972</td><td class="num pos">+0.019</td><td class="num">+0.0130</td><td class="num">+0.013 (z = 0.8)</td></tr>
+</table></div>
+<p>With rehearsal drawn from the solution pool, the identical update costs the researcher 15 points of task ability, and the damaged researcher's designs are indistinguishable from the base model's; weight precision accounts for 3 of the 15 points, the rest is the data. For a post-trained model, other models' solutions are a distribution shift of their own; on-policy rehearsal lets the update carry improvement experience without that cost.</p>
+
+<h3>3.4 A second round: task ability plateaus, improvement ability zig-zags upward</h3>
+<div class="tw"><table><caption><b>Table 4 · Chain heads by round (hidden / dev pass@1 %, I in points).</b></caption>
+<tr><th>round</th><th>practice chain</th><th>control chain (self-design + selection only)</th></tr>
+<tr><td>0</td><td class="num">57.85 / — / I 0.84</td><td class="num">57.85 / — / I 0.84</td></tr>
+<tr><td>1</td><td class="num">62.45 / 64.19 / I 0.78</td><td class="num">60.38 / 60.72 / I 1.48</td></tr>
+<tr class="hl"><td>2</td><td class="num">62.80 / 63.89 / I 1.36</td><td class="num">59.99 / 61.41 / —</td></tr>
+</table></div>
+<p>Both chains run a second round from their dev-selected round-1 heads. The practice chain's update pushes I to 1.87, the highest value in the study, and lowers T by 2.2 points; its eight self-designed programs are the mildest of any condition (4 of 8 positive, worst −1.1), and the dev-selected one reaches 62.80. The control chain's eight programs include none that is positive and one that collapses the model to 2% pass@1; dev selection discards it, and the new head scores 59.99. After two rounds the chains are 2.8 points apart (2.5 on dev), but neither gains in the second round on either split. I behaves differently from T: each update raises it (+0.46, +1.09) and each self-training step lowers it (−0.52, −0.51).</p>
+<figure><div class="plate"><img src="../assets/figs/fig_rounds.png" alt="Figure 4"></div>
+<figcaption><b>Figure 4 · Two rounds of both chains.</b> (a) In the (I, T) plane: solid arrows are proxy practice with the update, dashed arrows self-design with dev selection. (b) T of the chain head by round, held-out (solid) and dev (dotted).</figcaption></figure>
+
+<h3>3.5 Generalisation to later problems</h3>
+<p>On the 422-problem temporal OOD set (problems later than all training data), T(θ₀) = 0.333, the no-practice C = 0.351 (+1.8), and the practice chain's round-1 head = 0.351 (+1.8). The gain that dev selection finds is not specific to the held-out split's time window; the practised chain's 2.1-point advantage on the held-out split does not reappear on the later problems.</p>
+
+<h2 id="analysis"><span class="no">4</span>Analysis</h2>
+<h3>Where the information comes from, and why the loop plateaus</h3>
+<div class="callout"><b>Self-improvement without an external input is compression, not expansion.</b> The two chains differ in exactly one thing: whether new information enters between rounds. The control chain has none — the model writes its own training, trains on its own verified samples, and is selected on a fixed development split — and it moves once (+2.5) and stops. That single gain is the kind a closed loop can produce: converting pass@k into pass@1; the dose-matched rehearsal-only update produces the same +2.5 with no design at all. The practice chain has an external input, the measured outcomes of real proxy experiments, and the ability that input feeds keeps rising (I: 0.84 → 1.30 → 1.87) while the ability it does not feed plateaus with the control's (T: 62.5 → 62.8). What limits T is not the researcher but the fixed amount of information in the task environment. A model that improves itself from its own outputs alone — lifting itself by its own bootstraps — cannot sustain improvement; sustained self-improvement needs a channel through which facts the model cannot derive enter the loop, and the rate of that channel sets the rate of improvement.</div>
+<p>The channel here is reliable but slow: with four training seeds the per-world ranking reliability is 0.62–0.89, yet 976 proxy trainings yield fifty training examples; and the level T can reach is bounded separately by the problem pool and verifier. The second-round plateau is consistent with both.</p>
+<figure><div class="plate"><img src="../assets/figs/fig5_reliability.png" alt="Figure 5"></div>
+<figcaption><b>Figure 5 · Reliability of the reward.</b> Uplift of the same program under two training seeds, per rollout world, with the single-measurement correlation r and the reliability of the two-seed mean; four seeds raise the reliabilities to 0.65–0.89, and one world (easy_heavy_s22, 0.11), where programs do not measurably differ, is excluded from the update.</figcaption></figure>
+<h3>Why self-designed training mostly hurts</h3>
+<p>θ₀ is a post-trained model at 0.58 pass@1; a 240K-token supervised update on its own filtered samples moves it by a few points, mostly down. The programs are reasonable — the same families produce +1 to +3 points on the 2B proxies — and the difference is headroom: the proxies were built with a known defect to recover from, the 9B was not. In this regime a program's sign is close to a coin flip, and the quantity worth optimising is the <b>selection</b> among candidates, which a development split predicts well. The practised researcher's programs are less harmful on average and its selected best is higher, in the hypothesised direction and at a size this study cannot resolve.</p>
+<h3>How the programs change</h3>
+<figure><div class="plate"><img src="../assets/figs/fig3_programs.png" alt="Figure 6"></div>
+<figcaption><b>Figure 6 · Method mix (budget-weighted) and stages per program.</b> After practice the researcher writes single-stage programs almost exclusively, split between rejection sampling and failure-targeted synthesis — the families that did well on the proxies; all programs are distinct.</figcaption></figure>
+
+<h2 id="limits"><span class="no">5</span>Limitations</h2>
+<ul>
+<li><b>Power.</b> K = 8 and a within-condition s.d. of 0.035 give s.e.(Δ) ≈ 0.017: only a transfer effect of roughly 5 points would have been detected; the +1.3-point trend is a statement at that resolution.</li>
+<li><b>The control's I</b> rests on 4 executable programs out of 32; its validity rate is the firmer number.</li>
+<li><b>Protocol.</b> The pre-registered protocol drew rehearsal from the solution pool; the on-policy update and the conditions built on it were specified after that variant's result, with the pre-registered rule and K. The second-round update's task-ability loss (−2.2) exceeded the safety floor we had set for updates (−2.0); that round is reported as exploratory.</li>
+<li><b>Round 2 is single-chain evidence</b>: one dev-selected head per chain and round, so the 2.8-point separation carries the sampling noise of which program was selected.</li>
+<li><b>Scope.</b> One model family; one task domain; a 127-problem held-out split (measurement s.d. ≈ 0.015 per run); three rollout defect types and one sealed type; supervised objectives only; programs implemented by a stronger external coding agent (identical across conditions).</li>
+</ul>
+
+<h2 id="conclusion"><span class="no">6</span>Conclusion</h2>
+<p>Minimal-RSI makes every step of a recursive self-improvement loop real at a scale where it can be tested, and measures two turns of it. Practice on a smaller model, consolidated by an update with on-policy rehearsal, raises the researcher's improvement ability and its task ability in the same step; its self-designed training, selected on a development split, ends 4.6 points above the base model and 2.1 above the same procedure without practice; its designs for the base target trend better than the base model's own, at a size this study cannot resolve. A second round adds nothing detectable to task ability. What is resolved is that at this scale self-designed training is usually harmful, that its successes are predictable from a development split, that the rehearsal source decides whether the update helps or destroys, and that the loop's limiting resource is the rate at which real experiments feed it information. More generally, the two chains draw one lesson together: a model that improves itself from its own outputs alone redistributes what it already has, and improvement is sustained only at the rate at which facts it cannot derive enter the loop.</p>
+
+<p class="note">This page hosts the report; the experiment code and run records are not released yet.<br>Hao Chen · haochen2115@gmail.com</p>
+</div>
+</body></html>

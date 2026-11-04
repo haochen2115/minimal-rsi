@@ -1,92 +1,75 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Minimal-RSI</title><meta name="description" content="在更小的模型上练习，能让模型更擅长改进自己吗？一个最小的、每一步都真实执行的递归自我改进闭环。"><meta name="author" content="Hao Chen">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700;6..72,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* layout: a reading column on cool paper, full-width figure plates, a findings strip up front */
-:root{
-  --bg:#F5F7FA; --paper:#FFFFFF; --fg:#1B1F27; --muted:#5C6470; --rule:#D3D8E0;
-  --accent:#2F5D9B; --accent-ink:#1F3F6B; --warm:#C2701A; --good:#3B7D4F; --bad:#A3362C; --tile:#EAF0F8; --gold:#B8860B;
-  --serif:"Noto Serif SC","Songti SC","Source Han Serif SC",serif;
-  --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-  --mono:"JetBrains Mono",Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#13161C; --paper:#1B1F27; --fg:#E6E9EF; --muted:#9AA3B2; --rule:#333A47;
-  --accent:#8FB0E0; --accent-ink:#B9D0F0; --warm:#E09A4E; --good:#7DBA92; --bad:#E0796E; --tile:#232A36; --gold:#E0B64A; color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#13161C; --paper:#1B1F27; --fg:#E6E9EF; --muted:#9AA3B2; --rule:#333A47;
-  --accent:#8FB0E0; --accent-ink:#B9D0F0; --warm:#E09A4E; --good:#7DBA92; --bad:#E0796E; --tile:#232A36; --gold:#E0B64A; color-scheme:dark }
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.8;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 72px}
-.col{max-width:76ch;margin:0 auto}
-h1,h2,h3{font-family:var(--serif);text-wrap:balance;line-height:1.3}
-h1{font-size:2.25rem;margin:40px 0 6px;font-weight:900;letter-spacing:-.01em}
-h2{font-size:1.4rem;margin:60px 0 14px;padding-top:18px;border-top:1px solid var(--rule)}
-h2 .no{font-family:var(--mono);font-weight:400;color:var(--muted);font-size:.85rem;margin-right:10px;letter-spacing:.06em}
-h3{font-size:1.08rem;margin:30px 0 8px}
-p{margin:0 0 14px}
-.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:44px}
-.sub{color:var(--muted);font-size:1.08rem;margin:4px 0 18px;line-height:1.6}
-.links{display:flex;flex-wrap:wrap;gap:8px 10px;margin:0 0 26px}
-.links a{font-family:var(--mono);font-size:.78rem;padding:5px 11px;border:1px solid var(--rule);border-radius:999px;text-decoration:none;color:var(--fg)}
-.links a:hover{border-color:var(--accent);color:var(--accent)}
-.abstract{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:18px 22px;margin:0 0 10px}
-.abstract .h{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.abstract p{margin:0;font-size:.98rem;line-height:1.85}
-.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:26px 0 8px}
-.f{background:var(--tile);border-radius:8px;padding:16px 16px 14px;position:relative}
-.f .k{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-.f .n{font-family:var(--mono);font-size:1.7rem;font-weight:500;line-height:1.15;margin:6px 0 6px;font-variant-numeric:tabular-nums}
-.f .t{font-family:var(--serif);font-weight:700;font-size:1rem;line-height:1.4;margin-bottom:6px}
-.f .d{font-size:.86rem;color:var(--muted);line-height:1.55}
-.neg{color:var(--bad)} .pos{color:var(--good)} .warm{color:var(--warm)} .acc{color:var(--accent-ink)}
-figure{margin:24px 0}
-.plate{background:#FFFFFF;border:1px solid var(--rule);border-radius:8px;padding:14px;overflow-x:auto}
-.plate svg,.plate img{display:block;max-width:100%;height:auto;margin:0 auto}
-figcaption{font-size:.88rem;color:var(--muted);margin-top:10px;line-height:1.6}
-figcaption b{color:var(--fg)}
-.wide{max-width:1180px;margin-left:auto;margin-right:auto}
-table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums;margin:10px 0 6px}
-.tw{overflow-x:auto}
-caption{text-align:left;font-size:.86rem;color:var(--muted);padding:0 0 8px;caption-side:top}
-caption b{color:var(--fg)}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
-th{font-weight:500;color:var(--muted);font-size:.82rem;border-bottom:1.5px solid var(--fg)}
-td.num,th.num{text-align:right;font-family:var(--mono);font-size:.86rem}
-tr.hl td{background:var(--tile)}
-code{font-family:var(--mono);font-size:.86em;background:var(--tile);padding:1px 5px;border-radius:3px}
-pre{background:var(--tile);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:.78rem;overflow-x:auto;line-height:1.5}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
-.step{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
-.step .k{font-family:var(--serif);font-weight:700;color:var(--accent-ink);margin-bottom:4px}
-.step p{font-size:.9rem;margin:0}
-details{margin:18px 0;border:1px solid var(--rule);border-radius:8px;padding:6px 14px;background:var(--paper)} details summary{cursor:pointer;font-size:.95rem;color:var(--accent-ink);padding:6px 0} details[open] summary{border-bottom:1px solid var(--rule);margin-bottom:8px}
-.callout{border-left:3px solid var(--accent);padding:10px 16px;background:var(--tile);margin:16px 0;font-size:.95rem}
-ul,ol{padding-left:1.3em} li{margin-bottom:6px}
-a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
-.note{font-size:.88rem;color:var(--muted);border-top:1px dashed var(--rule);padding-top:12px;margin-top:40px}
-@media (max-width:520px){ h1{font-size:1.7rem} body{font-size:15px} }
+:root{--bg:#FFFFFF;--ink:#1F2328;--ink2:#57606A;--mute:#8A8F98;--rule:#E3E6EA;--accent:#1F4E79;--pos:#4C7A5A;--neg:#B5563A;
+--serif:'Source Serif 4','Noto Serif SC',Georgia,'Times New Roman',serif;--display:'Newsreader','Noto Serif SC',Georgia,serif;--sans:'IBM Plex Sans','Noto Sans SC',-apple-system,'Helvetica Neue',Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181D;--ink:#E7E9EC;--ink2:#AEB4BC;--mute:#7F868F;--rule:#2B3038;--accent:#9DB7D5;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181D;--ink:#E7E9EC;--ink2:#AEB4BC;--mute:#7F868F;--rule:#2B3038;--accent:#9DB7D5;color-scheme:dark}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.66;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html[lang^=zh] body{line-height:1.85;letter-spacing:.01em}
+.page{max-width:1120px;margin:0 auto;padding:0 16px 40px}
+.col{max-width:680px;margin:0 auto}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+b,strong{font-weight:600}
+.mast{position:relative;padding:72px 0 30px;border-bottom:1px solid var(--rule)}
+.lang{position:absolute;top:28px;right:0;font-family:var(--sans);font-size:13px}.lang a{color:var(--mute);margin-left:16px}.lang a[aria-current]{color:var(--ink)}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:500;font-size:42px;line-height:1.14;letter-spacing:-.012em;margin:0 0 18px;max-width:860px}
+html[lang^=zh] h1{font-weight:600;font-size:38px;line-height:1.3;letter-spacing:0}
+.dek{font-size:19px;line-height:1.5;color:var(--ink2);max-width:760px;margin:0 0 22px}
+html[lang^=zh] .dek{font-size:17.5px;line-height:1.7}
+.byline{font-family:var(--sans);font-size:13.5px;color:var(--ink2);margin:0}.byline span{color:var(--mute)}
+.toc{font-family:var(--sans);font-size:13px;padding:14px 0;border-bottom:1px solid var(--rule);display:flex;gap:20px;flex-wrap:wrap;margin-bottom:48px}.toc a{color:var(--ink2)}
+h2{font-family:var(--display);font-weight:500;font-size:27px;line-height:1.2;letter-spacing:-.006em;margin:60px 0 16px}
+html[lang^=zh] h2{font-weight:600;font-size:25px;letter-spacing:0}
+h2 .no{display:inline-block;min-width:34px;color:var(--mute);font-variant-numeric:tabular-nums;font-size:21px}
+h3{font-family:var(--sans);font-weight:600;font-size:15px;line-height:1.4;margin:36px 0 10px}
+p{margin:0 0 17px}ul,ol{margin:0 0 17px;padding-left:22px}li{margin:0 0 8px}
+.lead p{font-size:18.5px;line-height:1.62}html[lang^=zh] .lead p{font-size:17.5px;line-height:1.85}
+.lead b{font-weight:600}
+.abstract{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:22px 0 8px;margin:44px 0 0}
+.abstract h2{margin:0 0 12px;font-family:var(--sans);font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.abstract p{font-size:15.5px;line-height:1.64;color:var(--ink2)}html[lang^=zh] .abstract p{font-size:15px;line-height:1.85}
+ol.findings{list-style:none;padding:0;counter-reset:f;margin:0 0 8px}
+ol.findings li{position:relative;padding-left:46px;margin:0 0 16px;counter-increment:f}
+ol.findings li::before{content:counter(f);position:absolute;left:0;top:3px;width:26px;height:26px;border:1px solid var(--rule);border-radius:50%;font-family:var(--sans);font-size:12px;color:var(--mute);display:flex;align-items:center;justify-content:center}
+html[lang^=zh] ol.findings li::before{top:6px}
+figure{margin:36px 0}figure.wide{margin:40px auto;max-width:1120px}figure img{display:block;width:100%;height:auto;background:#fff}
+figcaption{font-family:var(--sans);font-size:13px;line-height:1.55;color:var(--ink2);margin:14px auto 0;max-width:680px}figcaption b{color:var(--ink);font-weight:600}
+html[lang^=zh] figcaption{line-height:1.7}
+.tw{overflow-x:auto;margin:8px 0 22px}
+table{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:13.5px;line-height:1.45;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink)}
+caption{caption-side:top;text-align:left;font-size:13px;color:var(--ink2);padding:0 0 8px}caption b{color:var(--ink);font-weight:600}
+th{font-weight:600;text-align:left;padding:9px 12px 8px 0;border-bottom:1px solid var(--rule);vertical-align:bottom;color:var(--ink)}
+td{padding:7px 12px 7px 0;border-bottom:1px solid var(--rule);vertical-align:top;color:var(--ink2)}th:last-child,td:last-child{padding-right:0}
+tr:last-child td{border-bottom:0}tr.hl td{color:var(--ink)}tr.hl td:first-child{font-weight:600}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th.num{text-align:right}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+ol.steps{padding-left:0;list-style:none}ol.steps li{padding-left:34px;position:relative;margin:0 0 12px}ol.steps li .k{position:absolute;left:0;font-family:var(--sans);font-size:13px;color:var(--mute);top:3px}
+blockquote.key{margin:30px 0;padding:2px 0 2px 22px;border-left:2px solid var(--accent)}blockquote.key p{margin:0}
+details{margin:22px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}summary{font-family:var(--sans);font-size:13.5px;color:var(--ink2);cursor:pointer;padding:12px 0;list-style:none}summary::-webkit-details-marker{display:none}
+summary::before{content:'+';display:inline-block;width:18px;color:var(--mute)}details[open] summary::before{content:'−'}details[open] summary{border-bottom:1px solid var(--rule)}details>*:not(summary){margin-left:0}details>h3:first-of-type{margin-top:20px}
+.note{font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--mute);margin:72px 0 0;padding-top:18px;border-top:1px solid var(--rule)}
+@media (max-width:700px){.mast{padding-top:60px}h1{font-size:30px}html[lang^=zh] h1{font-size:27px}.dek{font-size:17px}h2{font-size:23px;margin-top:48px}body{font-size:16px}.lang{top:22px}}
 </style>
-<style>html{color-scheme:light dark}body{margin:0} .lang{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:28px} .lang a{margin-right:14px}</style>
-</head><body>
-
-<div class="col">
-<div class="lang"><a href="../en/">English</a><a href="../zh/">中文</a></div>
-<div class="eyebrow">Technical report · Hao Chen</div>
+</head><body><div class="page">
+<header class="mast col">
+<nav class="lang"><a href="../en/">English</a><a href="../zh/" aria-current="page">中文</a></nav>
+<p class="eyebrow">Technical report</p>
 <h1>Minimal-RSI：在更小的模型上练习，能让模型更擅长改进自己吗？</h1>
-<p class="sub">一个最小的、每一步都真实执行的递归自我改进闭环——9B 模型为 2B 模型设计训练，在真实结果上学习，再为自己设计训练——以及它给出的答案。</p>
-<div class="links"><a href="#tldr">三句话</a><a href="#read">怎么读</a><a href="#abstract">摘要</a><a href="#findings">核心发现</a><a href="#method">方法</a><a href="#results">结果</a><a href="#analysis">分析</a><a href="#limits">局限</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
+<p class="dek">一个最小的、每一步都真实执行的递归自我改进闭环——9B 模型为 2B 模型设计训练，在真实结果上学习，再为自己设计训练——以及它给出的答案。</p>
+<p class="byline">Hao Chen</p>
+</header>
+<nav class="toc col"><a href="#tldr">三句话</a><a href="#read">怎么读</a><a href="#abstract">摘要</a><a href="#findings">核心发现</a><a href="#method">方法</a><a href="#results">结果</a><a href="#analysis">分析</a><a href="#limits">局限</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></nav>
 
-
-<div class="abstract" id="tldr"><div class="h">三句话</div>
-<p><b>想验证的事：</b>一个模型能不能通过"练习改进更小的模型"，学会改进自己——改进能力和任务能力一起涨。<br>
+<section class="lead col" id="tldr"><p><b>想验证的事：</b>一个模型能不能通过"练习改进更小的模型"，学会改进自己——改进能力和任务能力一起涨。<br>
 <b>做法：</b>让 9B 在带缺陷的 2B 上做几百次真实训练实验，把有效的经验学进去，然后让它给自己设计训练；另一条链不练习，直接给自己设计训练，作对照。<br>
-<b>结果：</b>一圈下来，练过的 9B 两种能力都升了，自我设计加挑选到 62.5%（基座 57.8，不练习 60.4）。但第二圈两条链都不再涨；自我设计的方案多数有害，是"挑选"救了它。没有外部输入，闭环只转一圈。</p></div>
-</div>
+<b>结果：</b>一圈下来，练过的 9B 两种能力都升了，自我设计加挑选到 62.5%（基座 57.8，不练习 60.4）。但第二圈两条链都不再涨；自我设计的方案多数有害，是"挑选"救了它。没有外部输入，闭环只转一圈。</p></section>
 
-<figure class="wide"><div class="plate"><img src="../assets/figs/fig_story_zh.svg" alt="图 0"></div>
-<figcaption><b>图 0 · 一页看懂。</b>(a) 理想中的 RSI：模型自己写方案、被方案训练、两种能力每圈都涨。(b) 我们做的最小版本：练习链先在 2B 上做真实实验（新信息从这里进入），再给自己设计训练；对照链跳过练习。每个圆圈是一个真实训练出来、真实测过的模型，T 是它在留出题上的 pass@1，I 是它写的方案在从未见过的 2B 上带来的提升，"能跑通的方案"是它写的 32 个方案里能执行的个数。(c) 四条结论，各配一张小图。</figcaption></figure>
+<figure class="wide"><img src="../assets/figs/fig_story_zh.svg" alt="图 1"><figcaption><b>图 1 · 闭环，以及我们测量的两条链。</b>左：一圈。researcher θ 为带缺陷的 2B 代理写训练方案，在有效的方案上更新得到 θ<sub>B</sub>；它再给自己设计训练，按 dev 选出的方案得到 θ′，作为下一圈的起点。在代理上练习是唯一有新信息进入的一步。右：每个圆圈都是真实训练并测量过的模型，上方数字是 T（留出题 pass@1），下方是 I（它的方案在封存 2B world 上的平均 uplift）和 32 个方案里能跑通的个数。对照链跳过练习。</figcaption></figure>
 
 <div class="col">
 <h2 id="read"><span class="no">§</span>怎么读这些数字</h2>
@@ -96,34 +79,25 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <li><b>dev / hidden</b>：挑方案只看 dev（开发集），报告分数只看 hidden（留出集）。两者的差距变大，就是在"背题"。</li>
 <li><b>圈</b>：练习 → 更新 → 自我设计 → 挑选，算一圈；选出的模型是下一圈的起点。</li>
 </ul>
-<div class="abstract" id="abstract"><div class="h">Abstract</div>
-<p>递归自我改进（RSI）大多只在无法做受控实验的规模上被讨论。我们提出 <b>Minimal-RSI</b>：一个小型系统，RSI 的定义性闭环在其中被真实地执行——语言模型为某个模型设计训练方案，方案被执行，效果被测量，模型在有效的方案上接受训练，随后为自己设计训练并接受这次训练。系统只用一个模型家族（9B 的 <em>researcher</em> 与 2B 的<em>代理模型</em>）、仅监督微调、8 张 40GB GPU。我们测量了闭环完整的两圈。researcher 在带缺陷的 2B checkpoint 上进行 244 次真实训练实验（976 次代理训练），在有效的方案上接受微调，rehearsal 取自它自己验证过的采样。这一次更新同时提高两种能力：在缺陷类型从未见过的封存代理任务上，改进能力从 +0.8 升到 +1.3 个 uplift 点，自身在留出的 LiveCodeBench 题目上的 pass@1 上升 +1.9；剂量对齐的对照表明前者来自改进经验、后者来自 on-policy rehearsal。更新后的 researcher 为自己设计训练并按开发集选择，达到 62.5% 的 pass@1，比基座高 4.6 个点、比不经练习的同一流程高 2.1 个点。第二圈两条链的任务能力都进入平台，改进能力则每次更新都升、每次自训练都降。在全部条件下，自我设计的训练多数情况下降低目标模型，而成功的方案可由开发集预测（r = 0.79）：在这个规模上，可靠的增益来自练习加上在模型自己的设计中做选择。</p></div>
+<section class="abstract" id="abstract"><h2>Abstract</h2><p>递归自我改进（RSI）大多只在无法做受控实验的规模上被讨论。我们提出 <b>Minimal-RSI</b>：一个小型系统，RSI 的定义性闭环在其中被真实地执行——语言模型为某个模型设计训练方案，方案被执行，效果被测量，模型在有效的方案上接受训练，随后为自己设计训练并接受这次训练。系统只用一个模型家族（9B 的 <em>researcher</em> 与 2B 的<em>代理模型</em>）、仅监督微调、8 张 40GB GPU。我们测量了闭环完整的两圈。researcher 在带缺陷的 2B checkpoint 上进行 244 次真实训练实验（976 次代理训练），在有效的方案上接受微调，rehearsal 取自它自己验证过的采样。这一次更新同时提高两种能力：在缺陷类型从未见过的封存代理任务上，改进能力从 +0.8 升到 +1.3 个 uplift 点，自身在留出的 LiveCodeBench 题目上的 pass@1 上升 +1.9；剂量对齐的对照表明前者来自改进经验、后者来自 on-policy rehearsal。更新后的 researcher 为自己设计训练并按开发集选择，达到 62.5% 的 pass@1，比基座高 4.6 个点、比不经练习的同一流程高 2.1 个点。第二圈两条链的任务能力都进入平台，改进能力则每次更新都升、每次自训练都降。在全部条件下，自我设计的训练多数情况下降低目标模型，而成功的方案可由开发集预测（r = 0.79）：在这个规模上，可靠的增益来自练习加上在模型自己的设计中做选择。</p></section>
 
 <h2 id="findings"><span class="no">§</span>核心发现</h2>
-<div class="findings">
-<div class="f"><div class="k">Finding 1</div><div class="n pos">I +0.5 · T +1.9</div><div class="t">一次更新，两种能力同步上升</div><div class="d">在 2B 代理上练习、再以 on-policy 更新巩固，researcher 的改进能力与任务能力在同一步里同时提高；自我设计加选择随后到达 62.5%（+4.6）。</div></div>
-<div class="f"><div class="k">Finding 2</div><div class="n acc">两条来源</div><div class="t">T 来自 rehearsal，I 来自改进经验</div><div class="d">同一更新去掉改进样本：T 上升同样多，I 不升、32 个提案只有 4 个能执行。改用其他模型的解答做 rehearsal：T 掉 15 个点。</div></div>
-<div class="f"><div class="k">Finding 3</div><div class="n neg">19 / 30</div><div class="t">自我设计多数有害，但可预测</div><div class="d">30 个自我设计方案中 19 个降低目标模型；dev 与 hidden 分数相关 r = 0.79。在这个规模上，选择比学习设计更值钱。</div></div>
-<div class="f"><div class="k">Finding 4</div><div class="n warm">左脚踩不了右脚</div><div class="t">没有外部输入，闭环只转一圈</div><div class="d">对照链一次 +2.5 后停住；练习链中外部实验喂养的 I 持续上升（0.84 → 1.87），无外部输入的 T 与对照链一起进入平台。改进的速率等于新信息进入闭环的速率。</div></div>
-</div>
+<ol class="findings"><li><b>一次更新，两种能力同步上升。</b> 在 2B 代理上练习、再以 on-policy 更新巩固，researcher 的改进能力与任务能力在同一步里同时提高；自我设计加选择随后到达 62.5%（+4.6）。</li><li><b>T 来自 rehearsal，I 来自改进经验。</b> 同一更新去掉改进样本：T 上升同样多，I 不升、32 个提案只有 4 个能执行。改用其他模型的解答做 rehearsal：T 掉 15 个点。</li><li><b>自我设计多数有害，但可预测。</b> 30 个自我设计方案中 19 个降低目标模型；dev 与 hidden 分数相关 r = 0.79。在这个规模上，选择比学习设计更值钱。</li><li><b>没有外部输入，闭环只转一圈。</b> 对照链一次 +2.5 后停住；练习链中外部实验喂养的 I 持续上升（0.84 → 1.87），无外部输入的 T 与对照链一起进入平台。改进的速率等于新信息进入闭环的速率。</li></ol>
 
 <h2 id="problem"><span class="no">1</span>问题</h2>
 <p>当改进一个系统的过程本身是该系统的产物、并随系统变强而变好时，这个系统在递归地改进自己。对语言模型而言，这个过程是训练；研究对象因此是一个决定模型（包括它自己）如何被训练、并且决定随经验而改善的模型。在前沿规模上，这件事昂贵且难以控制。我们转而寻找最小的设定，让闭环的每一步都真实发生，从而可以直接检验它所依赖的假设。</p>
 <p>我们采用三条操作性要求。<b>R1</b> 改进算子（训练方案）由模型产生，而非实验者固定的配方；<b>R2</b> 产生方案的能力从方案被真实执行后的测量效果中习得，而非来自学出来的奖励模型或自我评价；<b>R3</b> 任务能力 <b>T</b> 与改进能力 <b>I</b> 分开测量，使"闭环在运行"不被误当成"有所改进"。R2 需要大量真实结果，而训练模型自身是它能做的最昂贵的实验——于是让它在同一家族更小的模型上练习。由此引出本文的问题：<em>改进小代理模型的本领，能否迁移到改进自己？</em></p>
 
 <h2 id="method"><span class="no">2</span>方法</h2>
-<div class="steps">
-<div class="step"><div class="k">(a) 代理练习</div><p>researcher θ 读入一个带缺陷的 2B world 的失败画像，写训练方案；编码 agent 实现，2B 真实训练 4 个 seed、在留出集打分，方案在 world 内按 uplift 排序。</p></div>
-<div class="step"><div class="k">(b) 改进能力更新</div><p>θ 在排名前 25% 方案的原始 (prompt, response) 上做拒绝采样微调，混入 60% 的 rehearsal——模型自己在 train 上采样、通过测试的解答——得到 θ_B。</p></div>
-<div class="step"><div class="k">(c) 自我设计</div><p>θ_B 在<b>同一个 prompt 模板</b>下、以自己为对象写方案，方案作用于自身权重。</p></div>
-<div class="step"><div class="k">(d) 评测协议</div><p>固定目标 θ₀；θ₀ 与 θ_B 各写 K = 8 个方案，全部真实训练，比较 dT 的分布。C = θ₀ 的方案中按 dev 选出的最佳；B self：θ_B 给自己设计。</p></div>
-</div>
-</div>
+<ol class="steps"><li><span class="k">a</span><b>代理练习。</b> researcher θ 读入一个带缺陷的 2B world 的失败画像，写训练方案；编码 agent 实现，2B 真实训练 4 个 seed、在留出集打分，方案在 world 内按 uplift 排序。</li><li><span class="k">b</span><b>改进能力更新。</b> θ 在排名前 25% 方案的原始 (prompt, response) 上做拒绝采样微调，混入 60% 的 rehearsal——模型自己在 train 上采样、通过测试的解答——得到 θ_B。</li><li><span class="k">c</span><b>自我设计。</b> θ_B 在<b>同一个 prompt 模板</b>下、以自己为对象写方案，方案作用于自身权重。</li><li><span class="k">d</span><b>评测协议。</b> 固定目标 θ₀；θ₀ 与 θ_B 各写 K = 8 个方案，全部真实训练，比较 dT 的分布。C = θ₀ 的方案中按 dev 选出的最佳；B self：θ_B 给自己设计。</li></ol>
 
-<figure class="wide"><div class="plate"><img src="../assets/figs/fig1_method_zh.svg" alt="图 1"></div>
-<figcaption><b>图 1 · 方法总览。</b>橙色是 2B 代理，蓝色是 9B，绿色是测量。(c) 里的 prompt 与 (a) 完全相同，只有"待改进的模型"一格从 2B world 换成了 9B 自己——这是迁移假设能被检验的前提。(d) 中的散点为示意。</figcaption></figure>
 
+</div>
+<figure class="wide"><img src="../assets/figs/fig1_method_zh.svg" alt="图 2">
+<figcaption><b>图 2 · 方法总览。</b>橙色是 2B 代理，蓝色是 9B，绿色是测量。(c) 里的 prompt 与 (a) 完全相同，只有"待改进的模型"一格从 2B world 换成了 9B 自己——这是迁移假设能被检验的前提。(d) 中的散点为示意。</figcaption></figure>
 <div class="col">
+
+
 <p><b>度量。</b>T(θ) 是留出集上的 pass@1（avg@4，温度 0.8，4–8 次独立评测取平均）。方案 p 在 world w 上的 uplift 是 2B 后代的 pass@1 减去 parent 的（8 次评测均值）。I(θ) 是 θ 在<b>封存</b> world 上所提方案的平均 uplift，封存 world 的缺陷类型在练习中从未出现。dT(p) = T(用 p 训练后的目标) − T(目标)，无法执行的方案记 0。迁移指标 Δ = mean dT(B) − mean dT(A)，z ≥ 2 视为支持，规则与 K = 8 在运行前固定。</p>
 <div class="tw"><table><caption><b>表 0 · 设置。</b></caption>
 <tr><th>模型</th><td>Qwen3.5-9B（researcher）/ Qwen3.5-2B（代理）；非思考模式；实现 agent 在所有条件下相同</td></tr>
@@ -144,8 +118,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <tr><td>对照：同一更新、只有 rehearsal</td><td class="num">0.6034（+2.5）</td><td class="num">+0.0059 ± 0.0030</td><td class="num">4 / 32</td></tr>
 </table></div>
 <p>在两个缺陷类型从未在练习中出现的封存 world 上，θ_B 的方案 97% 有效（基座 53%，Fisher p &lt; 0.001），打分方案的平均 uplift 从 +0.0084 升到 +0.0130（26 个中 22 个为正）。researcher 自身的任务能力上升 +1.9 个点。剂量对齐的对照把两种效应分开：同样大小、只用 rehearsal 的更新让 T 上升同样多（+2.5），但 I 停在 +0.6、32 个提案只有 4 个能执行——<b>T 的增益来自 on-policy rehearsal，I 的增益来自改进经验</b>。θ_B 随后为自己设计八个方案，按开发集选出的那个到 0.6245。</p>
-<figure><div class="plate"><img src="../assets/figs/fig_plane.png" alt="图 2"></div>
-<figcaption><b>图 2 · 闭环的一圈在 (I, T) 平面上。</b>实心点为已测量的 checkpoint，附标准误。代理练习加 on-policy 更新让 researcher 向右上移动；同一更新去掉改进样本只向上移动；自我设计加选择再把两者向上推，练习过的那条推得更高。</figcaption></figure>
+<figure><img src="../assets/figs/fig_plane.png" alt="图 3">
+<figcaption><b>图 3 · 闭环的一圈在 (I, T) 平面上。</b>实心点为已测量的 checkpoint，附标准误；空心点为按 dev 选出的自训练模型，其 I 未测。代理练习加 on-policy 更新让 researcher 向右上移动；同一更新去掉改进样本只向上移动；自我设计加选择再把两者向上推，练习过的那条推得更高。</figcaption></figure>
 
 <h3>3.2 练习是否改善自我设计</h3>
 <div class="tw"><table><caption><b>表 2 · 各条件 K = 8 个方案的自我改进效应，dT 相对各自的目标。</b>无法执行的方案计 0。</caption>
@@ -156,8 +130,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </table></div>
 <p><b>迁移（B vs A）：Δ = +0.0133 ± 0.0169，z = 0.79。</b>更新后的 researcher 为基座目标写的方案平均损害更小，方向符合假设，但差异未达判据；区间排除了超过约 4.6 个点的迁移效应。为自己设计时，θ_B 的方案平均 −0.8（基座 A 组 −2.6），选出的最佳比 C 高 2.1 个点。</p>
 <p>两个分布的特征比它们的差值更重要。<b>自我设计的训练大多有害</b>：30 个成功执行的方案里 19 个降低目标模型，条件内离散度是条件间差异的两到三倍。<b>好方案可以事先识别</b>：22 个以 θ₀ 为目标的 checkpoint 上，dev 与 hidden 分数相关 r = 0.79，所以 dev 选择在每个条件下都能找回真实的增益。</p>
-<figure><div class="plate"><img src="../assets/figs/fig2_dT.png" alt="图 3"></div>
-<figcaption><b>图 3 · 各方案相对各自目标的 dT。</b>横线为条件均值 ± 标准误，空心圆为无法执行的方案，星号是 C（A 中按 dev 选出、在 hidden 上报告）。</figcaption></figure>
+<figure><img src="../assets/figs/fig2_dT.png" alt="图 4">
+<figcaption><b>图 4 · 各方案相对各自目标的 dT。</b>横线为条件均值 ± 标准误，空心圆为无法执行的方案，星号是 C（A 中按 dev 选出、在 hidden 上报告）。</figcaption></figure>
 
 <details><summary><b>更多数据：消融、时间泛化、方案构成、奖励信度</b></summary>
 <h3>3.3 消融：rehearsal 的来源决定更新是有益还是毁灭性的</h3>
@@ -177,8 +151,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <tr class="hl"><td>2</td><td class="num">62.80 / 63.89 / I 1.36</td><td class="num">59.99 / 61.41 / —</td></tr>
 </table></div>
 <p>两条链各从 dev 选出的第 1 圈头出发再跑一圈。练习链的更新把 I 推到 1.87（全研究最高），T 则下降 2.2 个点；它的八个自我设计方案是所有条件中最温和的（4/8 为正，最差 −1.1），dev 选出的头到 62.80。对照链的八个方案没有一个为正、其中一个把模型打到 2% 的 pass@1，dev 选择把它排除，新头 59.99。两圈之后两条链相差 2.8 个点（dev 2.5），但第二圈两条链在任一 split 上都没有增益。I 与 T 的行为不同：每次更新都提高它（+0.46、+1.09），每次自训练都降低它（−0.52、−0.51）。</p>
-<figure><div class="plate"><img src="../assets/figs/fig_rounds.png" alt="图 4"></div>
-<figcaption><b>图 4 · 两条链的两圈。</b>(a) (I, T) 平面：实线为代理练习加更新，虚线为自我设计加 dev 选择。(b) 各圈链头的 T，留出集（实线）与开发集（点线）。对照链第 2 圈的头在 (a) 中画为空心：测了 T，未测 I。</figcaption></figure>
+<figure><img src="../assets/figs/fig_rounds.png" alt="图 5">
+<figcaption><b>图 5 · 两条链的两圈。</b>(a) (I, T) 平面：深色为练习链，浅色为对照链；实线为代理练习加更新，虚线为自我设计加 dev 选择。(b) 各圈链头的 T，留出集（实线）与开发集（点线）。对照链第 2 圈的头在 (a) 中画为空心：测了 T，未测 I。</figcaption></figure>
 
 <details><summary><b>更多数据：泛化到更晚的题目</b></summary>
 <h3>3.5 泛化到更晚的题目</h3>
@@ -187,16 +161,16 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </details>
 <h2 id="analysis"><span class="no">4</span>分析</h2>
 <h3>信息从哪里来，为什么会平台</h3>
-<div class="callout"><b>没有外部输入的自我改进是压缩，不是扩展。</b>两条链只差一件事：圈与圈之间有没有新信息进入。对照链没有——模型自己写方案、在自己的验证样本上训练、在固定的开发集上被选择——它移动了一次（+2.5）就停下；这一次增益正是封闭闭环所能产生的那一种：把 pass@k 压成 pass@1，剂量对齐的纯 rehearsal 更新不需要任何设计就得到同样的 +2.5。练习链有一个外部输入——真实代理实验的结果——这个输入喂养的能力持续上升（I：0.84 → 1.30 → 1.87），它不喂养的能力则与对照链一起进入平台（T：62.5 → 62.8）。限制 T 的不是 researcher，而是任务环境里固定的信息量。模型仅凭自己的输出改进自己——"左脚踩右脚"——无法持续；持续的自我改进需要一条让模型推导不出的事实进入闭环的信道，而这条信道的速率决定了改进的速率。</div>
+<blockquote class="key"><p><b>没有外部输入的自我改进是压缩，不是扩展。</b>两条链只差一件事：圈与圈之间有没有新信息进入。对照链没有——模型自己写方案、在自己的验证样本上训练、在固定的开发集上被选择——它移动了一次（+2.5）就停下；这一次增益正是封闭闭环所能产生的那一种：把 pass@k 压成 pass@1，剂量对齐的纯 rehearsal 更新不需要任何设计就得到同样的 +2.5。练习链有一个外部输入——真实代理实验的结果——这个输入喂养的能力持续上升（I：0.84 → 1.30 → 1.87），它不喂养的能力则与对照链一起进入平台（T：62.5 → 62.8）。限制 T 的不是 researcher，而是任务环境里固定的信息量。模型仅凭自己的输出改进自己——"左脚踩右脚"——无法持续；持续的自我改进需要一条让模型推导不出的事实进入闭环的信道，而这条信道的速率决定了改进的速率。</p></blockquote>
 
 <p>只是反复阅读固定题集的闭环，至多把 pass@k 转化为 pass@1，必然饱和；缺乏外部信息源的自博弈会进入平台期。在 Minimal-RSI 中，新信息通过<em>实验</em>进入：某个方案能否改进某个模型，是关于学习动力学的事实，researcher 无法推导，每次真实训练揭示其中一部分。这条信道可靠但很慢——四个 seed 下排序信度 0.62–0.89，但 976 次代理训练只换来 50 个训练样本——而 T 能到达的高度另受题池与验证器约束。第二圈的平台与此一致。</p>
-<figure><div class="plate"><img src="../assets/figs/fig5_reliability.png" alt="图 5"></div>
-<figcaption><b>图 5 · 奖励的信度。</b>同一方案在两个训练 seed 下的 uplift，按 rollout world 分面，标出单次测量的相关 r 与两 seed 均值的信度；四个 seed 时升至 0.65–0.89，一个 world（easy_heavy_s22，0.11）的方案之间没有可测量差异，被排除在更新之外。</figcaption></figure>
+<figure><img src="../assets/figs/fig5_reliability.png" alt="图 6">
+<figcaption><b>图 6 · 奖励的信度。</b>同一方案在两个训练 seed 下的 uplift，按 rollout world 分面，标出单次测量的相关 r 与两 seed 均值的信度；四个 seed 时升至 0.65–0.89，一个 world（easy_heavy_s22，0.11）的方案之间没有可测量差异，被排除在更新之外。</figcaption></figure>
 <h3>为什么自我设计的训练大多有害</h3>
 <p>θ₀ 是一个 pass@1 为 0.58 的后训练模型；在自己的过滤样本上做 24 万 token 的监督更新只会让它移动几个点，且多半向下。方案本身是合理的——同样的方法族在 2B 代理上带来 +1 到 +3 个点——差别在于上升空间：代理带着植入的缺陷、有东西可挽回，9B 没有。此时方案的符号接近抛硬币，值得优化的量是候选之间的<b>选择</b>，而开发集对此预测得很好。练习过的 researcher 写出的方案平均损害更小、选出的最佳更高，方向与假设一致，幅度在本研究无法分辨的范围内。</p>
 <h3>方案本身如何变化</h3>
-<figure><div class="plate"><img src="../assets/figs/fig3_programs.png" alt="图 6"></div>
-<figcaption><b>图 6 · 方法构成（按预算份额）与 stage 数。</b>练习后的 researcher 几乎只写单 stage 方案，在拒绝采样与针对失败的合成之间各半——在代理上表现好的方法族；所有方案互不相同。</figcaption></figure>
+<figure><img src="../assets/figs/fig3_programs.png" alt="图 7">
+<figcaption><b>图 7 · 方法构成（按预算份额）与 stage 数。</b>练习后的 researcher 几乎只写单 stage 方案，在拒绝采样与针对失败的合成之间各半——在代理上表现好的方法族；所有方案互不相同。</figcaption></figure>
 
 <h2 id="limits"><span class="no">5</span>局限</h2>
 <ul>
@@ -211,6 +185,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <p>Minimal-RSI 让递归自我改进闭环的每一步在可检验的规模上真实发生，并测量了两圈。在更小的模型上练习、再以 on-policy rehearsal 的更新加以巩固，在同一步里提高了模型的改进能力与任务能力；它自我设计的训练在开发集选择下比基座高 4.6 个点、比不经练习的同一流程高 2.1 个点；它为基座设计的方案趋向更好，幅度在本研究无法分辨的范围内。第二圈对任务能力没有可检出的增益。能确定的是：在这个规模上自我设计的训练通常有害，它的成功可以由开发集预测，rehearsal 的来源决定了更新是有益还是毁灭性的，而闭环的限制性资源是真实实验的信息速率。更一般地，两条链共同给出的结论是：仅凭自己的输出改进自己的模型，只是在重新分配它已有的东西；自我改进得以持续的速率，等于模型推导不出的事实进入闭环的速率。接下来的问题是：迁移的趋势在足以判定的 K 下是否成立，以及可增长的经验证任务池是否会改变"设计"与"选择"二者中哪一个值得去学。</p>
 
 
+
 <p class="note">本页面为技术报告；实验代码与运行记录暂未公开。<br>Hao Chen · haochen2115@gmail.com</p>
 </div>
-</body></html>
+</div></body></html>

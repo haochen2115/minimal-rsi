@@ -1,91 +1,75 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Minimal-RSI</title><meta name="description" content="Does practicing on a smaller model make a model better at improving itself? A minimal recursive self-improvement loop in which every step is real."><meta name="author" content="Hao Chen">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700;6..72,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* layout: a reading column on cool paper, full-width figure plates, a findings strip up front */
-:root{
-  --bg:#F5F7FA; --paper:#FFFFFF; --fg:#1B1F27; --muted:#5C6470; --rule:#D3D8E0;
-  --accent:#2F5D9B; --accent-ink:#1F3F6B; --warm:#C2701A; --good:#3B7D4F; --bad:#A3362C; --tile:#EAF0F8; --gold:#B8860B;
-  --serif:"Noto Serif SC","Songti SC","Source Han Serif SC",serif;
-  --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-  --mono:"JetBrains Mono",Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#13161C; --paper:#1B1F27; --fg:#E6E9EF; --muted:#9AA3B2; --rule:#333A47;
-  --accent:#8FB0E0; --accent-ink:#B9D0F0; --warm:#E09A4E; --good:#7DBA92; --bad:#E0796E; --tile:#232A36; --gold:#E0B64A; color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#13161C; --paper:#1B1F27; --fg:#E6E9EF; --muted:#9AA3B2; --rule:#333A47;
-  --accent:#8FB0E0; --accent-ink:#B9D0F0; --warm:#E09A4E; --good:#7DBA92; --bad:#E0796E; --tile:#232A36; --gold:#E0B64A; color-scheme:dark }
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.8;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 72px}
-.col{max-width:76ch;margin:0 auto}
-h1,h2,h3{font-family:var(--serif);text-wrap:balance;line-height:1.3}
-h1{font-size:2.25rem;margin:40px 0 6px;font-weight:900;letter-spacing:-.01em}
-h2{font-size:1.4rem;margin:60px 0 14px;padding-top:18px;border-top:1px solid var(--rule)}
-h2 .no{font-family:var(--mono);font-weight:400;color:var(--muted);font-size:.85rem;margin-right:10px;letter-spacing:.06em}
-h3{font-size:1.08rem;margin:30px 0 8px}
-p{margin:0 0 14px}
-.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:44px}
-.sub{color:var(--muted);font-size:1.08rem;margin:4px 0 18px;line-height:1.6}
-.links{display:flex;flex-wrap:wrap;gap:8px 10px;margin:0 0 26px}
-.links a{font-family:var(--mono);font-size:.78rem;padding:5px 11px;border:1px solid var(--rule);border-radius:999px;text-decoration:none;color:var(--fg)}
-.links a:hover{border-color:var(--accent);color:var(--accent)}
-.abstract{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:18px 22px;margin:0 0 10px}
-.abstract .h{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.abstract p{margin:0;font-size:.98rem;line-height:1.85}
-.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:26px 0 8px}
-.f{background:var(--tile);border-radius:8px;padding:16px 16px 14px;position:relative}
-.f .k{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-.f .n{font-family:var(--mono);font-size:1.7rem;font-weight:500;line-height:1.15;margin:6px 0 6px;font-variant-numeric:tabular-nums}
-.f .t{font-family:var(--serif);font-weight:700;font-size:1rem;line-height:1.4;margin-bottom:6px}
-.f .d{font-size:.86rem;color:var(--muted);line-height:1.55}
-.neg{color:var(--bad)} .pos{color:var(--good)} .warm{color:var(--warm)} .acc{color:var(--accent-ink)}
-figure{margin:24px 0}
-.plate{background:#FFFFFF;border:1px solid var(--rule);border-radius:8px;padding:14px;overflow-x:auto}
-.plate svg,.plate img{display:block;max-width:100%;height:auto;margin:0 auto}
-figcaption{font-size:.88rem;color:var(--muted);margin-top:10px;line-height:1.6}
-figcaption b{color:var(--fg)}
-.wide{max-width:1180px;margin-left:auto;margin-right:auto}
-table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums;margin:10px 0 6px}
-.tw{overflow-x:auto}
-caption{text-align:left;font-size:.86rem;color:var(--muted);padding:0 0 8px;caption-side:top}
-caption b{color:var(--fg)}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
-th{font-weight:500;color:var(--muted);font-size:.82rem;border-bottom:1.5px solid var(--fg)}
-td.num,th.num{text-align:right;font-family:var(--mono);font-size:.86rem}
-tr.hl td{background:var(--tile)}
-code{font-family:var(--mono);font-size:.86em;background:var(--tile);padding:1px 5px;border-radius:3px}
-pre{background:var(--tile);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:.78rem;overflow-x:auto;line-height:1.5}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
-.step{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
-.step .k{font-family:var(--serif);font-weight:700;color:var(--accent-ink);margin-bottom:4px}
-.step p{font-size:.9rem;margin:0}
-details{margin:18px 0;border:1px solid var(--rule);border-radius:8px;padding:6px 14px;background:var(--paper)} details summary{cursor:pointer;font-size:.95rem;color:var(--accent-ink);padding:6px 0} details[open] summary{border-bottom:1px solid var(--rule);margin-bottom:8px}
-.callout{border-left:3px solid var(--accent);padding:10px 16px;background:var(--tile);margin:16px 0;font-size:.95rem}
-ul,ol{padding-left:1.3em} li{margin-bottom:6px}
-a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
-.note{font-size:.88rem;color:var(--muted);border-top:1px dashed var(--rule);padding-top:12px;margin-top:40px}
-@media (max-width:520px){ h1{font-size:1.7rem} body{font-size:15px} }
+:root{--bg:#FFFFFF;--ink:#1F2328;--ink2:#57606A;--mute:#8A8F98;--rule:#E3E6EA;--accent:#1F4E79;--pos:#4C7A5A;--neg:#B5563A;
+--serif:'Source Serif 4','Noto Serif SC',Georgia,'Times New Roman',serif;--display:'Newsreader','Noto Serif SC',Georgia,serif;--sans:'IBM Plex Sans','Noto Sans SC',-apple-system,'Helvetica Neue',Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181D;--ink:#E7E9EC;--ink2:#AEB4BC;--mute:#7F868F;--rule:#2B3038;--accent:#9DB7D5;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181D;--ink:#E7E9EC;--ink2:#AEB4BC;--mute:#7F868F;--rule:#2B3038;--accent:#9DB7D5;color-scheme:dark}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.66;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html[lang^=zh] body{line-height:1.85;letter-spacing:.01em}
+.page{max-width:1120px;margin:0 auto;padding:0 16px 40px}
+.col{max-width:680px;margin:0 auto}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+b,strong{font-weight:600}
+.mast{position:relative;padding:72px 0 30px;border-bottom:1px solid var(--rule)}
+.lang{position:absolute;top:28px;right:0;font-family:var(--sans);font-size:13px}.lang a{color:var(--mute);margin-left:16px}.lang a[aria-current]{color:var(--ink)}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:500;font-size:42px;line-height:1.14;letter-spacing:-.012em;margin:0 0 18px;max-width:860px}
+html[lang^=zh] h1{font-weight:600;font-size:38px;line-height:1.3;letter-spacing:0}
+.dek{font-size:19px;line-height:1.5;color:var(--ink2);max-width:760px;margin:0 0 22px}
+html[lang^=zh] .dek{font-size:17.5px;line-height:1.7}
+.byline{font-family:var(--sans);font-size:13.5px;color:var(--ink2);margin:0}.byline span{color:var(--mute)}
+.toc{font-family:var(--sans);font-size:13px;padding:14px 0;border-bottom:1px solid var(--rule);display:flex;gap:20px;flex-wrap:wrap;margin-bottom:48px}.toc a{color:var(--ink2)}
+h2{font-family:var(--display);font-weight:500;font-size:27px;line-height:1.2;letter-spacing:-.006em;margin:60px 0 16px}
+html[lang^=zh] h2{font-weight:600;font-size:25px;letter-spacing:0}
+h2 .no{display:inline-block;min-width:34px;color:var(--mute);font-variant-numeric:tabular-nums;font-size:21px}
+h3{font-family:var(--sans);font-weight:600;font-size:15px;line-height:1.4;margin:36px 0 10px}
+p{margin:0 0 17px}ul,ol{margin:0 0 17px;padding-left:22px}li{margin:0 0 8px}
+.lead p{font-size:18.5px;line-height:1.62}html[lang^=zh] .lead p{font-size:17.5px;line-height:1.85}
+.lead b{font-weight:600}
+.abstract{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:22px 0 8px;margin:44px 0 0}
+.abstract h2{margin:0 0 12px;font-family:var(--sans);font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.abstract p{font-size:15.5px;line-height:1.64;color:var(--ink2)}html[lang^=zh] .abstract p{font-size:15px;line-height:1.85}
+ol.findings{list-style:none;padding:0;counter-reset:f;margin:0 0 8px}
+ol.findings li{position:relative;padding-left:46px;margin:0 0 16px;counter-increment:f}
+ol.findings li::before{content:counter(f);position:absolute;left:0;top:3px;width:26px;height:26px;border:1px solid var(--rule);border-radius:50%;font-family:var(--sans);font-size:12px;color:var(--mute);display:flex;align-items:center;justify-content:center}
+html[lang^=zh] ol.findings li::before{top:6px}
+figure{margin:36px 0}figure.wide{margin:40px auto;max-width:1120px}figure img{display:block;width:100%;height:auto;background:#fff}
+figcaption{font-family:var(--sans);font-size:13px;line-height:1.55;color:var(--ink2);margin:14px auto 0;max-width:680px}figcaption b{color:var(--ink);font-weight:600}
+html[lang^=zh] figcaption{line-height:1.7}
+.tw{overflow-x:auto;margin:8px 0 22px}
+table{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:13.5px;line-height:1.45;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink)}
+caption{caption-side:top;text-align:left;font-size:13px;color:var(--ink2);padding:0 0 8px}caption b{color:var(--ink);font-weight:600}
+th{font-weight:600;text-align:left;padding:9px 12px 8px 0;border-bottom:1px solid var(--rule);vertical-align:bottom;color:var(--ink)}
+td{padding:7px 12px 7px 0;border-bottom:1px solid var(--rule);vertical-align:top;color:var(--ink2)}th:last-child,td:last-child{padding-right:0}
+tr:last-child td{border-bottom:0}tr.hl td{color:var(--ink)}tr.hl td:first-child{font-weight:600}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th.num{text-align:right}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+ol.steps{padding-left:0;list-style:none}ol.steps li{padding-left:34px;position:relative;margin:0 0 12px}ol.steps li .k{position:absolute;left:0;font-family:var(--sans);font-size:13px;color:var(--mute);top:3px}
+blockquote.key{margin:30px 0;padding:2px 0 2px 22px;border-left:2px solid var(--accent)}blockquote.key p{margin:0}
+details{margin:22px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}summary{font-family:var(--sans);font-size:13.5px;color:var(--ink2);cursor:pointer;padding:12px 0;list-style:none}summary::-webkit-details-marker{display:none}
+summary::before{content:'+';display:inline-block;width:18px;color:var(--mute)}details[open] summary::before{content:'−'}details[open] summary{border-bottom:1px solid var(--rule)}details>*:not(summary){margin-left:0}details>h3:first-of-type{margin-top:20px}
+.note{font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--mute);margin:72px 0 0;padding-top:18px;border-top:1px solid var(--rule)}
+@media (max-width:700px){.mast{padding-top:60px}h1{font-size:30px}html[lang^=zh] h1{font-size:27px}.dek{font-size:17px}h2{font-size:23px;margin-top:48px}body{font-size:16px}.lang{top:22px}}
 </style>
-<style>html{color-scheme:light dark}body{margin:0} .lang{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:28px} .lang a{margin-right:14px}</style>
-</head><body>
-<div class="col">
-<div class="lang"><a href="../en/">English</a><a href="../zh/">中文</a></div>
-<div class="eyebrow">Technical report · Hao Chen</div>
-<h1 style="font-family:Newsreader,Georgia,serif">Minimal-RSI: does practicing on a smaller model make a model better at improving itself?</h1>
-<p class="sub">A minimal recursive self-improvement loop in which every step is real — a 9B model designs the training of a 2B model, learns from the measured outcomes, then designs its own training — and the answer it gives.</p>
-<div class="links"><a href="#tldr">In brief</a><a href="#read">How to read</a><a href="#abstract">Abstract</a><a href="#findings">Findings</a><a href="#method">Method</a><a href="#results">Results</a><a href="#analysis">Analysis</a><a href="#limits">Limitations</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
+</head><body><div class="page">
+<header class="mast col">
+<nav class="lang"><a href="../en/" aria-current="page">English</a><a href="../zh/">中文</a></nav>
+<p class="eyebrow">Technical report</p>
+<h1>Minimal-RSI: does practicing on a smaller model make a model better at improving itself?</h1>
+<p class="dek">A minimal recursive self-improvement loop in which every step is real — a 9B model designs the training of a 2B model, learns from the measured outcomes, then designs its own training — and the answer it gives.</p>
+<p class="byline">Hao Chen</p>
+</header>
+<nav class="toc col"><a href="#tldr">In brief</a><a href="#read">How to read</a><a href="#abstract">Abstract</a><a href="#findings">Findings</a><a href="#method">Method</a><a href="#results">Results</a><a href="#analysis">Analysis</a><a href="#limits">Limitations</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></nav>
 
-
-<div class="abstract" id="tldr"><div class="h">In three sentences</div>
-<p><b>The question:</b> can a model learn to improve itself by practicing on a smaller model — so that improvement ability and task ability rise together?<br>
+<section class="lead col" id="tldr"><p><b>The question:</b> can a model learn to improve itself by practicing on a smaller model — so that improvement ability and task ability rise together?<br>
 <b>What we did:</b> a 9B ran hundreds of real training experiments on flawed 2B models, was fine-tuned on the experience that worked, and then designed its own training; a control chain skipped the practice and went straight to self-design.<br>
-<b>What happened:</b> after one turn the practised 9B was up on both abilities, and self-design plus selection reached 62.5% (base 57.8, no practice 60.4). In a second turn neither chain gained; most self-designed programs hurt, and selection is what rescued them. Without an external input the loop turns once.</p></div>
-</div>
+<b>What happened:</b> after one turn the practised 9B was up on both abilities, and self-design plus selection reached 62.5% (base 57.8, no practice 60.4). In a second turn neither chain gained; most self-designed programs hurt, and selection is what rescued them. Without an external input the loop turns once.</p></section>
 
-<figure class="wide"><div class="plate"><img src="../assets/figs/fig_story.svg" alt="Figure 0"></div>
-<figcaption><b>Figure 0 · The whole study on one page.</b> (a) The ideal: a model writes its own program, is trained by it, and both abilities rise every turn. (b) Our minimal version: the practice chain first runs real experiments on a 2B (new information enters here), then designs its own training; the control chain skips practice. Every circle is a model that was really trained and really measured: T is its pass@1 on held-out problems, I is the uplift its programs produce on 2B models with a defect it has never seen, "programs that run" counts how many of its 32 programs execute. (c) Four findings, each with its numbers.</figcaption></figure>
+<figure class="wide"><img src="../assets/figs/fig_story.svg" alt="Figure 1"><figcaption><b>Figure 1 · The loop, and the two chains we measured.</b> Left: one turn. The researcher θ writes training programs for flawed 2B proxies and is updated on the ones that worked (θ<sub>B</sub>); it then designs its own training, and the program selected on the dev split gives θ′, the start of the next turn. Practice on the proxies is the only step where new information enters. Right: every circle is a model that was really trained and measured. The number above it is T, pass@1 on held-out problems; below it are I, the mean uplift its programs produce on sealed 2B worlds, and how many of its 32 programs run. The control chain skips practice.</figcaption></figure>
 
 <div class="col">
 <h2 id="read"><span class="no">§</span>How to read the numbers</h2>
@@ -95,34 +79,25 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <li><b>dev / hidden</b>: programs are selected on the dev split only; scores are reported on the hidden split only. A growing gap between them is the signature of overfitting the selection.</li>
 <li><b>A turn</b>: practice → update → self-design → selection; the selected model starts the next turn.</li>
 </ul>
-<div class="abstract" id="abstract"><div class="h">Abstract</div>
-<p>Recursive self-improvement (RSI) is mostly discussed at scales where it cannot be studied as a controlled experiment. We present <b>Minimal-RSI</b>, a small system in which the defining loop of RSI is carried out for real: a language model designs a training program for a model, the program is executed, its effect is measured, the model is trained on the programs that worked, and it then designs and undergoes its own training. The system uses a single model family — a 9B <em>researcher</em> and a 2B <em>proxy</em> — supervised fine-tuning only, and eight 40 GB GPUs. We measure two full turns of the loop. The researcher runs 244 real training experiments on flawed 2B checkpoints (976 proxy trainings) and is fine-tuned on the programs that worked, with rehearsal drawn from its own verified samples. This single update raises both abilities at once: improvement ability on sealed proxy tasks with a defect never seen in practice rises from +0.8 to +1.3 points of uplift, and the researcher's own pass@1 on held-out LiveCodeBench problems rises by +1.9 points; a dose-matched control attributes the former to the improvement experience and the latter to on-policy rehearsal. The updated researcher then designs its own training; the program selected on a development split reaches 62.5% pass@1, +4.6 points over the base model and +2.1 over the same self-design-and-select procedure without proxy practice. In a second round, task ability plateaus for both chains while improvement ability rises with every update and falls with every self-training step. Across all conditions, self-designed training lowers its target in most instances, while the successful programs are predictable from a development split (r = 0.79): at this scale the dependable gains come from practice plus selection among the model's own designs.</p></div>
+<section class="abstract" id="abstract"><h2>Abstract</h2><p>Recursive self-improvement (RSI) is mostly discussed at scales where it cannot be studied as a controlled experiment. We present <b>Minimal-RSI</b>, a small system in which the defining loop of RSI is carried out for real: a language model designs a training program for a model, the program is executed, its effect is measured, the model is trained on the programs that worked, and it then designs and undergoes its own training. The system uses a single model family — a 9B <em>researcher</em> and a 2B <em>proxy</em> — supervised fine-tuning only, and eight 40 GB GPUs. We measure two full turns of the loop. The researcher runs 244 real training experiments on flawed 2B checkpoints (976 proxy trainings) and is fine-tuned on the programs that worked, with rehearsal drawn from its own verified samples. This single update raises both abilities at once: improvement ability on sealed proxy tasks with a defect never seen in practice rises from +0.8 to +1.3 points of uplift, and the researcher's own pass@1 on held-out LiveCodeBench problems rises by +1.9 points; a dose-matched control attributes the former to the improvement experience and the latter to on-policy rehearsal. The updated researcher then designs its own training; the program selected on a development split reaches 62.5% pass@1, +4.6 points over the base model and +2.1 over the same self-design-and-select procedure without proxy practice. In a second round, task ability plateaus for both chains while improvement ability rises with every update and falls with every self-training step. Across all conditions, self-designed training lowers its target in most instances, while the successful programs are predictable from a development split (r = 0.79): at this scale the dependable gains come from practice plus selection among the model's own designs.</p></section>
 
 <h2 id="findings"><span class="no">§</span>Findings</h2>
-<div class="findings">
-<div class="f"><div class="k">Finding 1</div><div class="n pos">I +0.5 · T +1.9</div><div class="t">One update raises both abilities</div><div class="d">Practice on 2B proxies, consolidated by an on-policy update, raises the researcher's improvement ability and task ability in the same step; self-design with selection then reaches 62.5% (+4.6).</div></div>
-<div class="f"><div class="k">Finding 2</div><div class="n acc">Two sources</div><div class="t">T from rehearsal, I from improvement experience</div><div class="d">The same update without the improvement examples raises T equally but not I, and only 4 of 32 proposals run. Rehearsal on other models' solutions costs 15 points of T.</div></div>
-<div class="f"><div class="k">Finding 3</div><div class="n neg">19 / 30</div><div class="t">Self-designed training mostly hurts, but predictably</div><div class="d">19 of 30 self-designed programs lower their target; dev and held-out scores correlate at r = 0.79. At this scale, selection is worth more than learned design.</div></div>
-<div class="f"><div class="k">Finding 4</div><div class="n warm">No bootstraps</div><div class="t">Without an external input the loop turns once</div><div class="d">The control chain gains +2.5 once and stops; in the practice chain the ability fed by real experiments keeps rising (I 0.84 → 1.87) while T plateaus with the control. Improvement runs at the rate new information enters.</div></div>
-</div>
+<ol class="findings"><li><b>One update raises both abilities.</b> Practice on 2B proxies, consolidated by an on-policy update, raises the researcher's improvement ability and task ability in the same step; self-design with selection then reaches 62.5% (+4.6).</li><li><b>T from rehearsal, I from improvement experience.</b> The same update without the improvement examples raises T equally but not I, and only 4 of 32 proposals run. Rehearsal on other models' solutions costs 15 points of T.</li><li><b>Self-designed training mostly hurts, but predictably.</b> 19 of 30 self-designed programs lower their target; dev and held-out scores correlate at r = 0.79. At this scale, selection is worth more than learned design.</li><li><b>Without an external input the loop turns once.</b> The control chain gains +2.5 once and stops; in the practice chain the ability fed by real experiments keeps rising (I 0.84 → 1.87) while T plateaus with the control. Improvement runs at the rate new information enters.</li></ol>
 
 <h2 id="problem"><span class="no">1</span>Problem</h2>
 <p>A system improves itself recursively when the procedure that improves it is itself a product of the system and gets better as the system does. For language models the procedure is training, so the object of interest is a model that decides how models — including itself — should be trained, and whose decisions improve with experience. Studying this at frontier scale is expensive and hard to control. We ask instead for the smallest setting in which every step of the loop is real, so that its central assumption can be tested directly.</p>
 <p>We adopt three operational requirements. <b>R1</b> The improvement operator (a training program) is produced by the model, not fixed by the experimenter. <b>R2</b> The ability to produce programs is learned from the measured effect of programs that were actually run — not from a learned reward model or self-assessment. <b>R3</b> Task ability <b>T</b> and improvement ability <b>I</b> are measured separately, so that running the loop is not mistaken for improving. R2 needs many real outcomes, and training the model itself is the most expensive experiment available to it — so the model practices on a smaller model of the same family. This poses the paper's question: <em>does skill at improving a small proxy transfer to improving oneself?</em></p>
 
 <h2 id="method"><span class="no">2</span>Method</h2>
-<div class="steps">
-<div class="step"><div class="k">(a) Proxy practice</div><p>The researcher θ reads the failure profile of a flawed 2B world and writes a training program; a coding agent implements it, the 2B is trained under 4 seeds and scored on the held-out split, and programs are ranked by uplift within each world.</p></div>
-<div class="step"><div class="k">(b) Improvement update</div><p>θ is fine-tuned on the original (prompt, response) pairs of the top 25% of programs, mixed with 60% rehearsal — its own samples on the train split that pass the tests — giving θ_B.</p></div>
-<div class="step"><div class="k">(c) Self-design</div><p>θ_B answers the <b>same prompt template</b> with itself as the subject; the program is applied to its own weights.</p></div>
-<div class="step"><div class="k">(d) Evaluation protocol</div><p>A fixed target θ₀; θ₀ and θ_B each write K = 8 programs, all really trained, and the dT distributions are compared. C = the best of θ₀'s programs by dev; B self: θ_B designs for itself.</p></div>
-</div>
-</div>
+<ol class="steps"><li><span class="k">a</span><b>Proxy practice.</b> The researcher θ reads the failure profile of a flawed 2B world and writes a training program; a coding agent implements it, the 2B is trained under 4 seeds and scored on the held-out split, and programs are ranked by uplift within each world.</li><li><span class="k">b</span><b>Improvement update.</b> θ is fine-tuned on the original (prompt, response) pairs of the top 25% of programs, mixed with 60% rehearsal — its own samples on the train split that pass the tests — giving θ_B.</li><li><span class="k">c</span><b>Self-design.</b> θ_B answers the <b>same prompt template</b> with itself as the subject; the program is applied to its own weights.</li><li><span class="k">d</span><b>Evaluation protocol.</b> A fixed target θ₀; θ₀ and θ_B each write K = 8 programs, all really trained, and the dT distributions are compared. C = the best of θ₀'s programs by dev; B self: θ_B designs for itself.</li></ol>
 
-<figure class="wide"><div class="plate"><img src="../assets/figs/fig1_method.svg" alt="Figure 1"></div>
-<figcaption><b>Figure 1 · Method overview.</b> Orange is the 2B proxy, blue the 9B, green the measurements. The prompt in (c) is identical to (a); only the "model to improve" changes from a 2B world to the 9B itself — the condition under which the transfer hypothesis can be tested. The strip plot in (d) is schematic.</figcaption></figure>
 
+</div>
+<figure class="wide"><img src="../assets/figs/fig1_method.svg" alt="Figure 2">
+<figcaption><b>Figure 2 · Method overview.</b> Orange is the 2B proxy, blue the 9B, green the measurements. The prompt in (c) is identical to (a); only the "model to improve" changes from a 2B world to the 9B itself — the condition under which the transfer hypothesis can be tested. The strip plot in (d) is schematic.</figcaption></figure>
 <div class="col">
+
+
 <p><b>Quantities.</b> T(θ) is pass@1 on the held-out split (avg@4, temperature 0.8, averaged over 4–8 independent evaluation runs). The uplift of program p on world w is the 2B descendant's pass@1 minus the parent's (mean of 8 runs). I(θ) is the mean uplift of θ's programs on <b>sealed</b> worlds, whose defect type never appears in practice. dT(p) = T(target trained by p) − T(target); a program that cannot be executed counts as 0. The transfer outcome is Δ = mean dT(B) − mean dT(A), z ≥ 2 taken as support; the rule and K = 8 were fixed before the runs.</p>
 <div class="tw"><table><caption><b>Table 0 · Setup.</b></caption>
 <tr><th>Models</th><td>Qwen3.5-9B (researcher) / Qwen3.5-2B (proxy); non-thinking mode; the implementing agent is identical across conditions</td></tr>
@@ -143,8 +118,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <tr><td>control: same update, rehearsal only</td><td class="num">0.6034 (+2.5)</td><td class="num">+0.0059 ± 0.0030</td><td class="num">4 / 32</td></tr>
 </table></div>
 <p>On the two sealed worlds, whose defect type never appears in practice, θ_B's programs are valid 97% of the time against 53% (Fisher p &lt; 0.001), and the scored programs' mean uplift rises from +0.0084 to +0.0130 (22 of 26 positive). The researcher's own task ability rises by +1.9 points. A dose-matched control separates the two effects: an update of the same size on rehearsal alone raises T as much (+2.5) but leaves I at +0.6 with only 4 of 32 proposals executable — <b>the task-ability gain is the on-policy rehearsal; the improvement-ability gain is the improvement experience</b>. θ_B then designs eight programs for itself; the one selected on the development split reaches 0.6245.</p>
-<figure><div class="plate"><img src="../assets/figs/fig_plane.png" alt="Figure 2"></div>
-<figcaption><b>Figure 2 · One turn of the loop in the (I, T) plane.</b> Filled markers are measured checkpoints with standard errors. Proxy practice with the on-policy update moves the researcher up and to the right; the same update without the improvement examples moves it up only; self-design with selection then moves either researcher up, further from the practised one.</figcaption></figure>
+<figure><img src="../assets/figs/fig_plane.png" alt="Figure 3">
+<figcaption><b>Figure 3 · One turn of the loop in the (I, T) plane.</b> Filled markers are measured checkpoints with standard errors; open markers are dev-selected self-trained models whose I has not been measured. Proxy practice with the on-policy update moves the researcher up and to the right; the same update without the improvement examples moves it up only; self-design with selection then moves either researcher up, further from the practised one.</figcaption></figure>
 
 <h3>3.2 Does practice improve self-design?</h3>
 <div class="tw"><table><caption><b>Table 2 · Self-improvement effect of K = 8 programs per condition, each dT against its own target.</b> A program that could not be executed counts as 0.</caption>
@@ -155,8 +130,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </table></div>
 <p><b>Transfer (B vs A): Δ = +0.0133 ± 0.0169, z = 0.79.</b> The updated researcher's programs for the base target are less harmful on average, in the hypothesised direction, but the difference does not reach the criterion; the interval excludes a transfer effect larger than about 4.6 points. Designing for itself, θ_B's programs average −0.8 (A: −2.6) and its selected program ends +2.1 points above C.</p>
 <p>Two features of the distributions matter more than their difference. <b>Self-designed training mostly hurts</b>: 19 of 30 executed programs lowered their target, and the within-condition spread is two to three times any between-condition difference. <b>The good programs are identifiable in advance</b>: across the 22 checkpoints targeting θ₀, dev and held-out scores correlate at r = 0.79, so selection on dev recovers real gains in every condition.</p>
-<figure><div class="plate"><img src="../assets/figs/fig2_dT.png" alt="Figure 3"></div>
-<figcaption><b>Figure 3 · dT of each program against its own target.</b> Bars are condition means ± s.e.; open circles are programs that could not be executed; the star is C (A's best by dev, reported on the held-out split).</figcaption></figure>
+<figure><img src="../assets/figs/fig2_dT.png" alt="Figure 4">
+<figcaption><b>Figure 4 · dT of each program against its own target.</b> Bars are condition means ± s.e.; open circles are programs that could not be executed; the star is C (A's best by dev, reported on the held-out split).</figcaption></figure>
 
 <details><summary><b>More data: ablation, temporal generalisation, program mix, reward reliability</b></summary>
 <h3>3.3 Ablation: the rehearsal source decides whether the update helps or destroys</h3>
@@ -176,8 +151,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <tr class="hl"><td>2</td><td class="num">62.80 / 63.89 / I 1.36</td><td class="num">59.99 / 61.41 / —</td></tr>
 </table></div>
 <p>Both chains run a second round from their dev-selected round-1 heads. The practice chain's update pushes I to 1.87, the highest value in the study, and lowers T by 2.2 points; its eight self-designed programs are the mildest of any condition (4 of 8 positive, worst −1.1), and the dev-selected one reaches 62.80. The control chain's eight programs include none that is positive and one that collapses the model to 2% pass@1; dev selection discards it, and the new head scores 59.99. After two rounds the chains are 2.8 points apart (2.5 on dev), but neither gains in the second round on either split. I behaves differently from T: each update raises it (+0.46, +1.09) and each self-training step lowers it (−0.52, −0.51).</p>
-<figure><div class="plate"><img src="../assets/figs/fig_rounds.png" alt="Figure 4"></div>
-<figcaption><b>Figure 4 · Two rounds of both chains.</b> (a) In the (I, T) plane: solid arrows are proxy practice with the update, dashed arrows self-design with dev selection. (b) T of the chain head by round, held-out (solid) and dev (dotted). The control chain's round-2 head is drawn open in (a): its T was measured, its I was not.</figcaption></figure>
+<figure><img src="../assets/figs/fig_rounds.png" alt="Figure 5">
+<figcaption><b>Figure 5 · Two rounds of both chains.</b> (a) In the (I, T) plane: dark is the practice chain, light the control chain; solid arrows are proxy practice with the update, dashed arrows self-design with dev selection. (b) T of the chain head by round, held-out (solid) and dev (dotted). The control chain's round-2 head is drawn open in (a): its T was measured, its I was not.</figcaption></figure>
 
 <details><summary><b>More data: generalisation to later problems</b></summary>
 <h3>3.5 Generalisation to later problems</h3>
@@ -186,15 +161,15 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </details>
 <h2 id="analysis"><span class="no">4</span>Analysis</h2>
 <h3>Where the information comes from, and why the loop plateaus</h3>
-<div class="callout"><b>Self-improvement without an external input is compression, not expansion.</b> The two chains differ in exactly one thing: whether new information enters between rounds. The control chain has none — the model writes its own training, trains on its own verified samples, and is selected on a fixed development split — and it moves once (+2.5) and stops. That single gain is the kind a closed loop can produce: converting pass@k into pass@1; the dose-matched rehearsal-only update produces the same +2.5 with no design at all. The practice chain has an external input, the measured outcomes of real proxy experiments, and the ability that input feeds keeps rising (I: 0.84 → 1.30 → 1.87) while the ability it does not feed plateaus with the control's (T: 62.5 → 62.8). What limits T is not the researcher but the fixed amount of information in the task environment. A model that improves itself from its own outputs alone — lifting itself by its own bootstraps — cannot sustain improvement; sustained self-improvement needs a channel through which facts the model cannot derive enter the loop, and the rate of that channel sets the rate of improvement.</div>
+<blockquote class="key"><p><b>Self-improvement without an external input is compression, not expansion.</b> The two chains differ in exactly one thing: whether new information enters between rounds. The control chain has none — the model writes its own training, trains on its own verified samples, and is selected on a fixed development split — and it moves once (+2.5) and stops. That single gain is the kind a closed loop can produce: converting pass@k into pass@1; the dose-matched rehearsal-only update produces the same +2.5 with no design at all. The practice chain has an external input, the measured outcomes of real proxy experiments, and the ability that input feeds keeps rising (I: 0.84 → 1.30 → 1.87) while the ability it does not feed plateaus with the control's (T: 62.5 → 62.8). What limits T is not the researcher but the fixed amount of information in the task environment. A model that improves itself from its own outputs alone — lifting itself by its own bootstraps — cannot sustain improvement; sustained self-improvement needs a channel through which facts the model cannot derive enter the loop, and the rate of that channel sets the rate of improvement.</p></blockquote>
 <p>The channel here is reliable but slow: with four training seeds the per-world ranking reliability is 0.62–0.89, yet 976 proxy trainings yield fifty training examples; and the level T can reach is bounded separately by the problem pool and verifier. The second-round plateau is consistent with both.</p>
-<figure><div class="plate"><img src="../assets/figs/fig5_reliability.png" alt="Figure 5"></div>
-<figcaption><b>Figure 5 · Reliability of the reward.</b> Uplift of the same program under two training seeds, per rollout world, with the single-measurement correlation r and the reliability of the two-seed mean; four seeds raise the reliabilities to 0.65–0.89, and one world (easy_heavy_s22, 0.11), where programs do not measurably differ, is excluded from the update.</figcaption></figure>
+<figure><img src="../assets/figs/fig5_reliability.png" alt="Figure 6">
+<figcaption><b>Figure 6 · Reliability of the reward.</b> Uplift of the same program under two training seeds, per rollout world, with the single-measurement correlation r and the reliability of the two-seed mean; four seeds raise the reliabilities to 0.65–0.89, and one world (easy_heavy_s22, 0.11), where programs do not measurably differ, is excluded from the update.</figcaption></figure>
 <h3>Why self-designed training mostly hurts</h3>
 <p>θ₀ is a post-trained model at 0.58 pass@1; a 240K-token supervised update on its own filtered samples moves it by a few points, mostly down. The programs are reasonable — the same families produce +1 to +3 points on the 2B proxies — and the difference is headroom: the proxies were built with a known defect to recover from, the 9B was not. In this regime a program's sign is close to a coin flip, and the quantity worth optimising is the <b>selection</b> among candidates, which a development split predicts well. The practised researcher's programs are less harmful on average and its selected best is higher, in the hypothesised direction and at a size this study cannot resolve.</p>
 <h3>How the programs change</h3>
-<figure><div class="plate"><img src="../assets/figs/fig3_programs.png" alt="Figure 6"></div>
-<figcaption><b>Figure 6 · Method mix (budget-weighted) and stages per program.</b> After practice the researcher writes single-stage programs almost exclusively, split between rejection sampling and failure-targeted synthesis — the families that did well on the proxies; all programs are distinct.</figcaption></figure>
+<figure><img src="../assets/figs/fig3_programs.png" alt="Figure 7">
+<figcaption><b>Figure 7 · Method mix (budget-weighted) and stages per program.</b> After practice the researcher writes single-stage programs almost exclusively, split between rejection sampling and failure-targeted synthesis — the families that did well on the proxies; all programs are distinct.</figcaption></figure>
 
 <h2 id="limits"><span class="no">5</span>Limitations</h2>
 <ul>
@@ -208,6 +183,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <h2 id="conclusion"><span class="no">6</span>Conclusion</h2>
 <p>Minimal-RSI makes every step of a recursive self-improvement loop real at a scale where it can be tested, and measures two turns of it. Practice on a smaller model, consolidated by an update with on-policy rehearsal, raises the researcher's improvement ability and its task ability in the same step; its self-designed training, selected on a development split, ends 4.6 points above the base model and 2.1 above the same procedure without practice; its designs for the base target trend better than the base model's own, at a size this study cannot resolve. A second round adds nothing detectable to task ability. What is resolved is that at this scale self-designed training is usually harmful, that its successes are predictable from a development split, that the rehearsal source decides whether the update helps or destroys, and that the loop's limiting resource is the rate at which real experiments feed it information. More generally, the two chains draw one lesson together: a model that improves itself from its own outputs alone redistributes what it already has, and improvement is sustained only at the rate at which facts it cannot derive enter the loop.</p>
 
+
 <p class="note">This page hosts the report; the experiment code and run records are not released yet.<br>Hao Chen · haochen2115@gmail.com</p>
 </div>
-</body></html>
+</div></body></html>

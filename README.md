@@ -10,10 +10,10 @@ A minimal recursive self-improvement loop in which every step is real: a 9B mode
 
 Main results:
 
-- One update raises both abilities at once: improvement ability on sealed proxy tasks +0.8 → +1.3 points of uplift, the 9B's own held-out pass@1 +1.9. A dose-matched control attributes the first to the improvement experience and the second to on-policy rehearsal.
+- One update raises both abilities at once: improvement ability on sealed proxy tasks +0.8 → +1.3 points of uplift, the 9B's own held-out pass@1 +1.9. With rehearsal drawn from other models' solutions instead of the 9B's own verified samples, the same update costs 15 points.
 - The updated 9B's self-designed training, selected on a development split, reaches 62.5% pass@1: +4.6 over the base model, +2.1 over the same procedure without proxy practice.
 - Self-designed training mostly hurts (19 of 30 programs), but the good programs are predictable from a development split (r = 0.79): selection is worth more than learned design at this scale.
-- Without an external input the loop turns once: the no-practice chain gains +2.5 and stops, while in the practice chain the ability fed by real experiments keeps rising and task ability plateaus. Self-improvement without new information is compression, not expansion.
+- Without an external input the loop turns once: self-design without practice gains +2.5 once; in the loop, the ability fed by real experiments keeps rising while task ability plateaus after one turn. Self-improvement without new information is compression, not expansion.
 
 This repository hosts the report only; the experiment code and run records are not released yet.
 

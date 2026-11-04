@@ -61,6 +61,7 @@ pre{background:var(--tile);border-radius:6px;padding:12px 14px;font-family:var(-
 .step{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
 .step .k{font-family:var(--serif);font-weight:700;color:var(--accent-ink);margin-bottom:4px}
 .step p{font-size:.9rem;margin:0}
+details{margin:18px 0;border:1px solid var(--rule);border-radius:8px;padding:6px 14px;background:var(--paper)} details summary{cursor:pointer;font-size:.95rem;color:var(--accent-ink);padding:6px 0} details[open] summary{border-bottom:1px solid var(--rule);margin-bottom:8px}
 .callout{border-left:3px solid var(--accent);padding:10px 16px;background:var(--tile);margin:16px 0;font-size:.95rem}
 ul,ol{padding-left:1.3em} li{margin-bottom:6px}
 a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
@@ -75,8 +76,26 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <div class="eyebrow">Technical report · Hao Chen</div>
 <h1>Minimal-RSI：在更小的模型上练习，能让模型更擅长改进自己吗？</h1>
 <p class="sub">一个最小的、每一步都真实执行的递归自我改进闭环——9B 模型为 2B 模型设计训练，在真实结果上学习，再为自己设计训练——以及它给出的答案。</p>
-<div class="links"><a href="#abstract">摘要</a><a href="#findings">核心发现</a><a href="#method">方法</a><a href="#results">结果</a><a href="#analysis">分析</a><a href="#limits">局限</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
+<div class="links"><a href="#tldr">三句话</a><a href="#read">怎么读</a><a href="#abstract">摘要</a><a href="#findings">核心发现</a><a href="#method">方法</a><a href="#results">结果</a><a href="#analysis">分析</a><a href="#limits">局限</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
 
+
+<div class="abstract" id="tldr"><div class="h">三句话</div>
+<p><b>想验证的事：</b>一个模型能不能通过"练习改进更小的模型"，学会改进自己——改进能力和任务能力一起涨。<br>
+<b>做法：</b>让 9B 在带缺陷的 2B 上做几百次真实训练实验，把有效的经验学进去，然后让它给自己设计训练；另一条链不练习，直接给自己设计训练，作对照。<br>
+<b>结果：</b>一圈下来，练过的 9B 两种能力都升了，自我设计加挑选到 62.5%（基座 57.8，不练习 60.4）。但第二圈两条链都不再涨；自我设计的方案多数有害，是"挑选"救了它。没有外部输入，闭环只转一圈。</p></div>
+</div>
+
+<figure class="wide"><div class="plate"><img src="../assets/figs/fig_story_zh.svg" alt="图 0"></div>
+<figcaption><b>图 0 · 一页看懂。</b>(a) 理想中的 RSI：模型自己写方案、被方案训练、两种能力每圈都涨。(b) 我们做的最小版本：练习链先在 2B 上做真实实验（新信息从这里进入），再给自己设计训练；对照链跳过练习。每个圆圈是一个真实训练出来、真实测过的模型，T 是它在留出题上的 pass@1，I 是它写的方案在从未见过的 2B 上带来的提升，"能跑通的方案"是它写的 32 个方案里能执行的个数。(c) 四条结论，各配一张小图。</figcaption></figure>
+
+<div class="col">
+<h2 id="read"><span class="no">§</span>怎么读这些数字</h2>
+<ul>
+<li><b>T</b>（任务能力）：模型自己做 127 道留出编程题的 pass@1，百分数。一次测量的噪声约 ±1.5 分，所以 1 分以内的差别不要当真。</li>
+<li><b>I</b>（改进能力）：让模型给两个它从未见过缺陷类型的 2B 写训练方案，真的训、真的测，方案带来的平均提升（百分点）。只算跑通的方案，所以要同时看"能跑通的方案"有几个——对照链第 1 圈的 I = 1.48 看着高，但 32 个方案只有 15 个合法；按跑不通计 0，它是 0.60，练习链的头是 0.73。</li>
+<li><b>dev / hidden</b>：挑方案只看 dev（开发集），报告分数只看 hidden（留出集）。两者的差距变大，就是在"背题"。</li>
+<li><b>圈</b>：练习 → 更新 → 自我设计 → 挑选，算一圈；选出的模型是下一圈的起点。</li>
+</ul>
 <div class="abstract" id="abstract"><div class="h">Abstract</div>
 <p>递归自我改进（RSI）大多只在无法做受控实验的规模上被讨论。我们提出 <b>Minimal-RSI</b>：一个小型系统，RSI 的定义性闭环在其中被真实地执行——语言模型为某个模型设计训练方案，方案被执行，效果被测量，模型在有效的方案上接受训练，随后为自己设计训练并接受这次训练。系统只用一个模型家族（9B 的 <em>researcher</em> 与 2B 的<em>代理模型</em>）、仅监督微调、8 张 40GB GPU。我们测量了闭环完整的两圈。researcher 在带缺陷的 2B checkpoint 上进行 244 次真实训练实验（976 次代理训练），在有效的方案上接受微调，rehearsal 取自它自己验证过的采样。这一次更新同时提高两种能力：在缺陷类型从未见过的封存代理任务上，改进能力从 +0.8 升到 +1.3 个 uplift 点，自身在留出的 LiveCodeBench 题目上的 pass@1 上升 +1.9；剂量对齐的对照表明前者来自改进经验、后者来自 on-policy rehearsal。更新后的 researcher 为自己设计训练并按开发集选择，达到 62.5% 的 pass@1，比基座高 4.6 个点、比不经练习的同一流程高 2.1 个点。第二圈两条链的任务能力都进入平台，改进能力则每次更新都升、每次自训练都降。在全部条件下，自我设计的训练多数情况下降低目标模型，而成功的方案可由开发集预测（r = 0.79）：在这个规模上，可靠的增益来自练习加上在模型自己的设计中做选择。</p></div>
 
@@ -140,6 +159,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <figure><div class="plate"><img src="../assets/figs/fig2_dT.png" alt="图 3"></div>
 <figcaption><b>图 3 · 各方案相对各自目标的 dT。</b>横线为条件均值 ± 标准误，空心圆为无法执行的方案，星号是 C（A 中按 dev 选出、在 hidden 上报告）。</figcaption></figure>
 
+<details><summary><b>更多数据：消融、时间泛化、方案构成、奖励信度</b></summary>
 <h3>3.3 消融：rehearsal 的来源决定更新是有益还是毁灭性的</h3>
 <div class="tw"><table><caption><b>表 3 · 同一批 50 个改进样本、不同 rehearsal 来源的更新（token 质量相同）。</b></caption>
 <tr><th>rehearsal</th><th class="num">更新后 T</th><th class="num">ΔT</th><th class="num">更新后 I</th><th class="num">迁移 Δ vs A</th></tr>
@@ -148,6 +168,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </table></div>
 <p>rehearsal 取自解答池时，同一次更新让 researcher 损失 15 个点的任务能力，受损模型的设计与基座无法区分；权重精度只占其中 3 点，其余来自数据。对一个后训练模型而言，其他模型的解答本身就是分布偏移；on-policy rehearsal 让更新能携带改进经验而不付出这个代价。</p>
 
+</details>
 <h3>3.4 第二圈：任务能力进入平台，改进能力锯齿上升</h3>
 <div class="tw"><table><caption><b>表 4 · 各圈链头（hidden / dev pass@1 %，I 单位为点）。</b></caption>
 <tr><th>圈</th><th>练习链</th><th>对照链（只有自我设计 + 选择）</th></tr>
@@ -159,9 +180,11 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <figure><div class="plate"><img src="../assets/figs/fig_rounds.png" alt="图 4"></div>
 <figcaption><b>图 4 · 两条链的两圈。</b>(a) (I, T) 平面：实线为代理练习加更新，虚线为自我设计加 dev 选择。(b) 各圈链头的 T，留出集（实线）与开发集（点线）。对照链第 2 圈的头在 (a) 中画为空心：测了 T，未测 I。</figcaption></figure>
 
+<details><summary><b>更多数据：泛化到更晚的题目</b></summary>
 <h3>3.5 泛化到更晚的题目</h3>
 <p>在 422 题的时间外推集上（题目晚于全部训练数据），T(θ₀) = 0.333，不经练习的 C = 0.351（+1.8），练习链第 1 圈的头 = 0.351（+1.8）。dev 选择找到的增益不局限于留出集的时间窗口；练习链在留出集上 2.1 个点的优势在更晚的题目上没有再现。</p>
 
+</details>
 <h2 id="analysis"><span class="no">4</span>分析</h2>
 <h3>信息从哪里来，为什么会平台</h3>
 <div class="callout"><b>没有外部输入的自我改进是压缩，不是扩展。</b>两条链只差一件事：圈与圈之间有没有新信息进入。对照链没有——模型自己写方案、在自己的验证样本上训练、在固定的开发集上被选择——它移动了一次（+2.5）就停下；这一次增益正是封闭闭环所能产生的那一种：把 pass@k 压成 pass@1，剂量对齐的纯 rehearsal 更新不需要任何设计就得到同样的 +2.5。练习链有一个外部输入——真实代理实验的结果——这个输入喂养的能力持续上升（I：0.84 → 1.30 → 1.87），它不喂养的能力则与对照链一起进入平台（T：62.5 → 62.8）。限制 T 的不是 researcher，而是任务环境里固定的信息量。模型仅凭自己的输出改进自己——"左脚踩右脚"——无法持续；持续的自我改进需要一条让模型推导不出的事实进入闭环的信道，而这条信道的速率决定了改进的速率。</div>

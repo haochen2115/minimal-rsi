@@ -61,6 +61,7 @@ pre{background:var(--tile);border-radius:6px;padding:12px 14px;font-family:var(-
 .step{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
 .step .k{font-family:var(--serif);font-weight:700;color:var(--accent-ink);margin-bottom:4px}
 .step p{font-size:.9rem;margin:0}
+details{margin:18px 0;border:1px solid var(--rule);border-radius:8px;padding:6px 14px;background:var(--paper)} details summary{cursor:pointer;font-size:.95rem;color:var(--accent-ink);padding:6px 0} details[open] summary{border-bottom:1px solid var(--rule);margin-bottom:8px}
 .callout{border-left:3px solid var(--accent);padding:10px 16px;background:var(--tile);margin:16px 0;font-size:.95rem}
 ul,ol{padding-left:1.3em} li{margin-bottom:6px}
 a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
@@ -74,8 +75,26 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <div class="eyebrow">Technical report · Hao Chen</div>
 <h1 style="font-family:Newsreader,Georgia,serif">Minimal-RSI: does practicing on a smaller model make a model better at improving itself?</h1>
 <p class="sub">A minimal recursive self-improvement loop in which every step is real — a 9B model designs the training of a 2B model, learns from the measured outcomes, then designs its own training — and the answer it gives.</p>
-<div class="links"><a href="#abstract">Abstract</a><a href="#findings">Findings</a><a href="#method">Method</a><a href="#results">Results</a><a href="#analysis">Analysis</a><a href="#limits">Limitations</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
+<div class="links"><a href="#tldr">In brief</a><a href="#read">How to read</a><a href="#abstract">Abstract</a><a href="#findings">Findings</a><a href="#method">Method</a><a href="#results">Results</a><a href="#analysis">Analysis</a><a href="#limits">Limitations</a><a href="https://github.com/haochen2115/minimal-rsi">GitHub</a></div>
 
+
+<div class="abstract" id="tldr"><div class="h">In three sentences</div>
+<p><b>The question:</b> can a model learn to improve itself by practicing on a smaller model — so that improvement ability and task ability rise together?<br>
+<b>What we did:</b> a 9B ran hundreds of real training experiments on flawed 2B models, was fine-tuned on the experience that worked, and then designed its own training; a control chain skipped the practice and went straight to self-design.<br>
+<b>What happened:</b> after one turn the practised 9B was up on both abilities, and self-design plus selection reached 62.5% (base 57.8, no practice 60.4). In a second turn neither chain gained; most self-designed programs hurt, and selection is what rescued them. Without an external input the loop turns once.</p></div>
+</div>
+
+<figure class="wide"><div class="plate"><img src="../assets/figs/fig_story.svg" alt="Figure 0"></div>
+<figcaption><b>Figure 0 · The whole study on one page.</b> (a) The ideal: a model writes its own program, is trained by it, and both abilities rise every turn. (b) Our minimal version: the practice chain first runs real experiments on a 2B (new information enters here), then designs its own training; the control chain skips practice. Every circle is a model that was really trained and really measured: T is its pass@1 on held-out problems, I is the uplift its programs produce on 2B models with a defect it has never seen, "programs that run" counts how many of its 32 programs execute. (c) Four findings, each with its numbers.</figcaption></figure>
+
+<div class="col">
+<h2 id="read"><span class="no">§</span>How to read the numbers</h2>
+<ul>
+<li><b>T</b> (task ability): the model's own pass@1 on 127 held-out coding problems, in percent. One measurement has about ±1.5 points of noise, so differences under a point do not mean anything.</li>
+<li><b>I</b> (improvement ability): the model writes training programs for two 2B models whose defect type it has never seen; the programs are really run, and I is the mean improvement they produce, in points. It is averaged over programs that run, so read it next to "programs that run" — the control chain's round-1 head shows I = 1.48, but only 15 of its 32 programs were even valid; counting failures as zero it is 0.60, against 0.73 for the practised head.</li>
+<li><b>dev / hidden</b>: programs are selected on the dev split only; scores are reported on the hidden split only. A growing gap between them is the signature of overfitting the selection.</li>
+<li><b>A turn</b>: practice → update → self-design → selection; the selected model starts the next turn.</li>
+</ul>
 <div class="abstract" id="abstract"><div class="h">Abstract</div>
 <p>Recursive self-improvement (RSI) is mostly discussed at scales where it cannot be studied as a controlled experiment. We present <b>Minimal-RSI</b>, a small system in which the defining loop of RSI is carried out for real: a language model designs a training program for a model, the program is executed, its effect is measured, the model is trained on the programs that worked, and it then designs and undergoes its own training. The system uses a single model family — a 9B <em>researcher</em> and a 2B <em>proxy</em> — supervised fine-tuning only, and eight 40 GB GPUs. We measure two full turns of the loop. The researcher runs 244 real training experiments on flawed 2B checkpoints (976 proxy trainings) and is fine-tuned on the programs that worked, with rehearsal drawn from its own verified samples. This single update raises both abilities at once: improvement ability on sealed proxy tasks with a defect never seen in practice rises from +0.8 to +1.3 points of uplift, and the researcher's own pass@1 on held-out LiveCodeBench problems rises by +1.9 points; a dose-matched control attributes the former to the improvement experience and the latter to on-policy rehearsal. The updated researcher then designs its own training; the program selected on a development split reaches 62.5% pass@1, +4.6 points over the base model and +2.1 over the same self-design-and-select procedure without proxy practice. In a second round, task ability plateaus for both chains while improvement ability rises with every update and falls with every self-training step. Across all conditions, self-designed training lowers its target in most instances, while the successful programs are predictable from a development split (r = 0.79): at this scale the dependable gains come from practice plus selection among the model's own designs.</p></div>
 
@@ -139,6 +158,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <figure><div class="plate"><img src="../assets/figs/fig2_dT.png" alt="Figure 3"></div>
 <figcaption><b>Figure 3 · dT of each program against its own target.</b> Bars are condition means ± s.e.; open circles are programs that could not be executed; the star is C (A's best by dev, reported on the held-out split).</figcaption></figure>
 
+<details><summary><b>More data: ablation, temporal generalisation, program mix, reward reliability</b></summary>
 <h3>3.3 Ablation: the rehearsal source decides whether the update helps or destroys</h3>
 <div class="tw"><table><caption><b>Table 3 · The update on the same 50 selected programs with rehearsal from different sources (token mass matched).</b></caption>
 <tr><th>rehearsal</th><th class="num">T after update</th><th class="num">ΔT</th><th class="num">I after update</th><th class="num">transfer Δ vs A</th></tr>
@@ -147,6 +167,7 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 </table></div>
 <p>With rehearsal drawn from the solution pool, the identical update costs the researcher 15 points of task ability, and the damaged researcher's designs are indistinguishable from the base model's; weight precision accounts for 3 of the 15 points, the rest is the data. For a post-trained model, other models' solutions are a distribution shift of their own; on-policy rehearsal lets the update carry improvement experience without that cost.</p>
 
+</details>
 <h3>3.4 A second round: task ability plateaus, improvement ability zig-zags upward</h3>
 <div class="tw"><table><caption><b>Table 4 · Chain heads by round (hidden / dev pass@1 %, I in points).</b></caption>
 <tr><th>round</th><th>practice chain</th><th>control chain (self-design + selection only)</th></tr>
@@ -158,9 +179,11 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 <figure><div class="plate"><img src="../assets/figs/fig_rounds.png" alt="Figure 4"></div>
 <figcaption><b>Figure 4 · Two rounds of both chains.</b> (a) In the (I, T) plane: solid arrows are proxy practice with the update, dashed arrows self-design with dev selection. (b) T of the chain head by round, held-out (solid) and dev (dotted). The control chain's round-2 head is drawn open in (a): its T was measured, its I was not.</figcaption></figure>
 
+<details><summary><b>More data: generalisation to later problems</b></summary>
 <h3>3.5 Generalisation to later problems</h3>
 <p>On the 422-problem temporal OOD set (problems later than all training data), T(θ₀) = 0.333, the no-practice C = 0.351 (+1.8), and the practice chain's round-1 head = 0.351 (+1.8). The gain that dev selection finds is not specific to the held-out split's time window; the practised chain's 2.1-point advantage on the held-out split does not reappear on the later problems.</p>
 
+</details>
 <h2 id="analysis"><span class="no">4</span>Analysis</h2>
 <h3>Where the information comes from, and why the loop plateaus</h3>
 <div class="callout"><b>Self-improvement without an external input is compression, not expansion.</b> The two chains differ in exactly one thing: whether new information enters between rounds. The control chain has none — the model writes its own training, trains on its own verified samples, and is selected on a fixed development split — and it moves once (+2.5) and stops. That single gain is the kind a closed loop can produce: converting pass@k into pass@1; the dose-matched rehearsal-only update produces the same +2.5 with no design at all. The practice chain has an external input, the measured outcomes of real proxy experiments, and the ability that input feeds keeps rising (I: 0.84 → 1.30 → 1.87) while the ability it does not feed plateaus with the control's (T: 62.5 → 62.8). What limits T is not the researcher but the fixed amount of information in the task environment. A model that improves itself from its own outputs alone — lifting itself by its own bootstraps — cannot sustain improvement; sustained self-improvement needs a channel through which facts the model cannot derive enter the loop, and the rate of that channel sets the rate of improvement.</div>
